@@ -1,16 +1,16 @@
 namespace _3d_graphics_editor.Geometry
 {
-    public class Vertex
+    public class Normal
     {
         public float X;
         public float Y;
         public float Z;
 
-        public Vertex()
+        public Normal()
         {
         }
 
-        public Vertex(float x, float y, float z)
+        public Normal(float x, float y, float z)
         {
             X = x;
             Y = y;
