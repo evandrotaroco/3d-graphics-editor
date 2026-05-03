@@ -1,5 +1,4 @@
 using System.Drawing.Drawing2D;
-using System.Numerics;
 using _3d_graphics_editor.Geometry;
 
 namespace _3d_graphics_editor.Rendering
@@ -109,35 +108,41 @@ namespace _3d_graphics_editor.Rendering
             graphics.DrawString(subtitle, subtitleFont, subtitleBrush, subtitlePoint);
         }
 
-        private static Vector3[] TransformVertices(Mesh mesh, float rotationX, float rotationY, float rotationZ)
+        private static Vector3D[] TransformVertices(Mesh mesh, float rotationX, float rotationY, float rotationZ)
         {
             var bounds = ComputeBounds(mesh.Vertices);
-            var center = (bounds.Min + bounds.Max) * 0.5f;
-            var size = bounds.Max - bounds.Min;
+            var center = new Vector3D(
+                (bounds.Min.X + bounds.Max.X) * 0.5f,
+                (bounds.Min.Y + bounds.Max.Y) * 0.5f,
+                (bounds.Min.Z + bounds.Max.Z) * 0.5f);
+
+            var size = new Vector3D(
+                bounds.Max.X - bounds.Min.X,
+                bounds.Max.Y - bounds.Min.Y,
+                bounds.Max.Z - bounds.Min.Z);
+
             var maxDimension = MathF.Max(size.X, MathF.Max(size.Y, size.Z));
             var scale = maxDimension <= 0.0001f ? 1f : 2f / maxDimension;
 
-            var rotationMatrix =
-                Matrix4x4.CreateRotationX(rotationX) *
-                Matrix4x4.CreateRotationY(rotationY) *
-                Matrix4x4.CreateRotationZ(rotationZ);
-
-            var transformed = new Vector3[mesh.Vertices.Count];
+            var transformed = new Vector3D[mesh.Vertices.Count];
             for (var i = 0; i < mesh.Vertices.Count; i++)
             {
                 var vertex = mesh.Vertices[i];
-                var normalized = new Vector3(vertex.X, vertex.Y, vertex.Z) - center;
-                normalized *= scale;
-                transformed[i] = Vector3.Transform(normalized, rotationMatrix);
+                var normalized = new Vector3D(
+                    (vertex.X - center.X) * scale,
+                    (vertex.Y - center.Y) * scale,
+                    (vertex.Z - center.Z) * scale);
+
+                transformed[i] = RotatePoint(normalized, rotationX, rotationY, rotationZ);
             }
 
             return transformed;
         }
 
-        private static (Vector3 Min, Vector3 Max) ComputeBounds(IReadOnlyList<Vertex> vertices)
+        private static (Vector3D Min, Vector3D Max) ComputeBounds(IReadOnlyList<Vertex> vertices)
         {
-            var min = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
-            var max = new Vector3(float.MinValue, float.MinValue, float.MinValue);
+            var min = new Vector3D(float.MaxValue, float.MaxValue, float.MaxValue);
+            var max = new Vector3D(float.MinValue, float.MinValue, float.MinValue);
 
             foreach (var vertex in vertices)
             {
@@ -153,7 +158,49 @@ namespace _3d_graphics_editor.Rendering
             return (min, max);
         }
 
-        private static bool TryProject(Vector3 point, Rectangle bounds, float zoom, out PointF projectedPoint)
+        private static Vector3D RotatePoint(Vector3D point, float angleX, float angleY, float angleZ)
+        {
+            var rotated = RotateAroundX(point, angleX);
+            rotated = RotateAroundY(rotated, angleY);
+            rotated = RotateAroundZ(rotated, angleZ);
+
+            return rotated;
+        }
+
+        private static Vector3D RotateAroundX(Vector3D point, float angle)
+        {
+            var cos = MathF.Cos(angle);
+            var sin = MathF.Sin(angle);
+
+            return new Vector3D(
+                point.X,
+                (point.Y * cos) - (point.Z * sin),
+                (point.Y * sin) + (point.Z * cos));
+        }
+
+        private static Vector3D RotateAroundY(Vector3D point, float angle)
+        {
+            var cos = MathF.Cos(angle);
+            var sin = MathF.Sin(angle);
+
+            return new Vector3D(
+                (point.X * cos) + (point.Z * sin),
+                point.Y,
+                (-point.X * sin) + (point.Z * cos));
+        }
+
+        private static Vector3D RotateAroundZ(Vector3D point, float angle)
+        {
+            var cos = MathF.Cos(angle);
+            var sin = MathF.Sin(angle);
+
+            return new Vector3D(
+                (point.X * cos) - (point.Y * sin),
+                (point.X * sin) + (point.Y * cos),
+                point.Z);
+        }
+
+        private static bool TryProject(Vector3D point, Rectangle bounds, float zoom, out PointF projectedPoint)
         {
             var depth = point.Z + CameraDistance;
             if (depth <= 0.01f)
@@ -234,6 +281,20 @@ namespace _3d_graphics_editor.Rendering
             public int First { get; }
 
             public int Second { get; }
+        }
+
+        private struct Vector3D
+        {
+            public float X;
+            public float Y;
+            public float Z;
+
+            public Vector3D(float x, float y, float z)
+            {
+                X = x;
+                Y = y;
+                Z = z;
+            }
         }
     }
 }
