@@ -74,8 +74,6 @@ namespace _3d_graphics_editor
                 UpdateUiState();
                 viewportPanel.Focus();
                 viewportPanel.Invalidate();
-
-                statusLabel.Text = $"Modelo carregado: {Path.GetFileName(dialog.FileName)}";
             }
             catch (Exception ex)
             {
@@ -85,8 +83,6 @@ namespace _3d_graphics_editor
                     "Erro ao abrir OBJ",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
-
-                statusLabel.Text = "Falha ao carregar o arquivo OBJ.";
             }
         }
 
@@ -100,9 +96,6 @@ namespace _3d_graphics_editor
             ResetViewState();
             viewportPanel.Invalidate();
             UpdateUiState();
-            statusLabel.Text = _currentMesh is null
-                ? "Visualizacao resetada."
-                : "Visualizacao do modelo resetada.";
         }
 
         private void ViewportPanel_Paint(object? sender, PaintEventArgs e)
@@ -198,7 +191,6 @@ namespace _3d_graphics_editor
             ResetViewState();
             viewportPanel.Invalidate();
             UpdateUiState();
-            statusLabel.Text = "Viewport limpa.";
         }
 
         private void ResetViewState()
