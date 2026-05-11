@@ -1,17 +1,22 @@
 using System.Globalization;
+using System.Drawing;
 using System.Text;
+using System.Linq;
 using _3d_graphics_editor.Geometry;
 
 namespace _3d_graphics_editor.IO
 {
     public static class ObjMeshSerializer
     {
+        private static readonly CultureInfo DecimalCommaCulture = new("pt-BR");
+
         public static Mesh Load(string path)
         {
             ArgumentNullException.ThrowIfNull(path);
 
             var mesh = new Mesh();
             var lineNumber = 0;
+            var currentMaterialName = (string?)null;
 
             foreach (var rawLine in File.ReadLines(path))
             {
@@ -33,6 +38,12 @@ namespace _3d_graphics_editor.IO
                 {
                     switch (parts[0])
                     {
+                        case "mtllib":
+                            LoadMaterialLibrary(parts, path, mesh);
+                            break;
+                        case "usemtl":
+                            currentMaterialName = ParseMaterialName(parts);
+                            break;
                         case "v":
                             mesh.Vertices.Add(ParseVertex(parts));
                             break;
@@ -43,7 +54,7 @@ namespace _3d_graphics_editor.IO
                             mesh.Normals.Add(ParseNormal(parts));
                             break;
                         case "f":
-                            mesh.Faces.Add(ParseFace(parts, mesh));
+                            mesh.Faces.Add(ParseFace(parts, mesh, currentMaterialName));
                             break;
                     }
                 }
@@ -101,14 +112,17 @@ namespace _3d_graphics_editor.IO
                 ParseFloat(parts[3]));
         }
 
-        private static Face ParseFace(string[] parts, Mesh mesh)
+        private static Face ParseFace(string[] parts, Mesh mesh, string? materialName)
         {
             if (parts.Length < 4)
             {
                 throw new FormatException("Face must have at least three vertices.");
             }
 
-            var face = new Face();
+            var face = new Face
+            {
+                MaterialName = materialName
+            };
 
             for (var i = 1; i < parts.Length; i++)
             {
@@ -120,6 +134,63 @@ namespace _3d_graphics_editor.IO
             }
 
             return face;
+        }
+
+        private static void LoadMaterialLibrary(string[] parts, string objPath, Mesh mesh)
+        {
+            if (parts.Length < 2)
+            {
+                return;
+            }
+
+            var materialFileName = string.Join(" ", parts.Skip(1));
+            var objDirectory = Path.GetDirectoryName(objPath) ?? string.Empty;
+            var materialPath = Path.Combine(objDirectory, materialFileName);
+
+            if (!File.Exists(materialPath))
+            {
+                return;
+            }
+
+            Material? currentMaterial = null;
+
+            foreach (var rawLine in File.ReadLines(materialPath))
+            {
+                var line = rawLine.Trim();
+                if (line.Length == 0 || line.StartsWith("#", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var tokens = SplitTokens(line);
+                if (tokens.Length == 0)
+                {
+                    continue;
+                }
+
+                switch (tokens[0])
+                {
+                    case "newmtl":
+                        currentMaterial = new Material
+                        {
+                            Name = string.Join(" ", tokens.Skip(1))
+                        };
+
+                        if (currentMaterial.Name.Length > 0)
+                        {
+                            mesh.Materials[currentMaterial.Name] = currentMaterial;
+                        }
+                        break;
+                    case "Kd" when currentMaterial is not null && tokens.Length >= 4:
+                        currentMaterial.DiffuseColor = ColorFromObj(tokens[1], tokens[2], tokens[3]);
+                        break;
+                }
+            }
+        }
+
+        private static string? ParseMaterialName(string[] parts)
+        {
+            return parts.Length < 2 ? null : string.Join(" ", parts.Skip(1));
         }
 
         private static FaceVertex ParseFaceVertex(
@@ -159,7 +230,41 @@ namespace _3d_graphics_editor.IO
 
         private static float ParseFloat(string value)
         {
-            return float.Parse(value, CultureInfo.InvariantCulture);
+            value = value.Trim();
+
+            // Alguns arquivos OBJ exportados em ambiente local usam virgula
+            // como separador decimal, como acontece no Cereja.obj.
+            if (value.Contains(',') && !value.Contains('.'))
+            {
+                if (float.TryParse(value, NumberStyles.Float, DecimalCommaCulture, out var decimalCommaParsed))
+                {
+                    return decimalCommaParsed;
+                }
+            }
+
+            if (float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var invariantParsed))
+            {
+                return invariantParsed;
+            }
+
+            var normalizedValue = value.Replace(',', '.');
+            if (float.TryParse(normalizedValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var normalizedParsed))
+            {
+                return normalizedParsed;
+            }
+
+            throw new FormatException($"Invalid floating-point value: \"{value}\"");
+        }
+
+        private static Color ColorFromObj(string red, string green, string blue)
+        {
+            static int ToByte(string value)
+            {
+                var component = ParseFloat(value);
+                return Math.Clamp((int)MathF.Round(component * 255f), 0, 255);
+            }
+
+            return Color.FromArgb(ToByte(red), ToByte(green), ToByte(blue));
         }
 
         private static string FormatFaceVertex(FaceVertex faceVertex)

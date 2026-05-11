@@ -8,5 +8,6 @@ namespace _3d_graphics_editor.Geometry
         public List<TexCoord> TexCoords = new();
         public List<Normal> Normals = new();
         public List<Face> Faces = new();
+        public Dictionary<string, Material> Materials = new(StringComparer.Ordinal);
     }
 }
