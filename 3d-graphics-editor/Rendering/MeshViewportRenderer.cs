@@ -526,7 +526,7 @@ namespace _3d_graphics_editor.Rendering
             foreach (var face in renderableFaces)
             {
                 var faceColor = (uniformFillColor ?? face.FillColor).ToArgb();
-                RasterizeFace(face, bounds, width, height, fillFaces, faceColor);
+                ScanlineFill(face, bounds, width, height, fillFaces, faceColor);
             }
 
             CopyColorBufferToBitmap(width, height);
@@ -626,7 +626,7 @@ namespace _3d_graphics_editor.Rendering
             }
         }
 
-        private void RasterizeFace(
+        private void ScanlineFill(
             RenderableFace face,
             Rectangle bounds,
             int width,
@@ -639,82 +639,126 @@ namespace _3d_graphics_editor.Rendering
                 return;
             }
 
-            var first = face.ScreenVertices[0];
-            for (var i = 1; i < face.ScreenVertices.Length - 1; i++)
+            var points = new Point[face.ScreenVertices.Length];
+            var depthSamples = new double[face.ScreenVertices.Length];
+            for (var i = 0; i < face.ScreenVertices.Length; i++)
             {
-                RasterizeTriangle(
-                    first,
-                    face.ScreenVertices[i],
-                    face.ScreenVertices[i + 1],
-                    bounds,
-                    width,
-                    height,
-                    writeColor,
-                    colorArgb,
-                    face.UseReciprocalDepthInterpolation);
+                points[i] = ToBitmapPoint(face.ScreenVertices[i].Point, bounds);
+                depthSamples[i] = ToDepthSample(face.ScreenVertices[i].Depth, face.UseReciprocalDepthInterpolation);
             }
-        }
 
-        private void RasterizeTriangle(
-            ScreenVertex first,
-            ScreenVertex second,
-            ScreenVertex third,
-            Rectangle bounds,
-            int width,
-            int height,
-            bool writeColor,
-            int colorArgb,
-            bool useReciprocalDepthInterpolation)
-        {
-            var x0 = first.Point.X - bounds.Left;
-            var y0 = first.Point.Y - bounds.Top;
-            var x1 = second.Point.X - bounds.Left;
-            var y1 = second.Point.Y - bounds.Top;
-            var x2 = third.Point.X - bounds.Left;
-            var y2 = third.Point.Y - bounds.Top;
+            var yMinPolygon = points.Min(point => point.Y);
+            var yMaxPolygon = points.Max(point => point.Y);
+            var firstVisibleY = Math.Max(yMinPolygon, 0);
+            var lastVisibleY = Math.Min(yMaxPolygon, height - 1);
 
-            var area = EdgeFunction(x0, y0, x1, y1, x2, y2);
-            if (MathF.Abs(area) <= 0.000001f)
+            if (firstVisibleY > lastVisibleY)
             {
                 return;
             }
 
-            var minX = Math.Clamp((int)MathF.Floor(MathF.Min(x0, MathF.Min(x1, x2))), 0, width - 1);
-            var maxX = Math.Clamp((int)MathF.Ceiling(MathF.Max(x0, MathF.Max(x1, x2))), 0, width - 1);
-            var minY = Math.Clamp((int)MathF.Floor(MathF.Min(y0, MathF.Min(y1, y2))), 0, height - 1);
-            var maxY = Math.Clamp((int)MathF.Ceiling(MathF.Max(y0, MathF.Max(y1, y2))), 0, height - 1);
+            var edgeTable = new Dictionary<int, List<EdgeEntry>>();
 
-            if (minX > maxX || minY > maxY)
+            for (var i = 0; i < points.Length; i++)
             {
-                return;
-            }
+                var p1 = points[i];
+                var p2 = points[(i + 1) % points.Length];
+                var depth1 = depthSamples[i];
+                var depth2 = depthSamples[(i + 1) % points.Length];
 
-            var inverseArea = 1f / area;
-            for (var y = minY; y <= maxY; y++)
-            {
-                var sampleY = y + 0.5f;
-                for (var x = minX; x <= maxX; x++)
+                if (p1.Y == p2.Y)
                 {
-                    var sampleX = x + 0.5f;
-                    var weight0 = EdgeFunction(x1, y1, x2, y2, sampleX, sampleY) * inverseArea;
-                    var weight1 = EdgeFunction(x2, y2, x0, y0, sampleX, sampleY) * inverseArea;
-                    var weight2 = EdgeFunction(x0, y0, x1, y1, sampleX, sampleY) * inverseArea;
+                    continue;
+                }
 
-                    if (weight0 < -DepthEpsilon || weight1 < -DepthEpsilon || weight2 < -DepthEpsilon)
+                if (p1.Y > p2.Y)
+                {
+                    (p1, p2) = (p2, p1);
+                    (depth1, depth2) = (depth2, depth1);
+                }
+
+                if (p2.Y <= 0 || p1.Y >= height)
+                {
+                    continue;
+                }
+
+                var deltaY = p2.Y - p1.Y;
+                var incrementX = (double)(p2.X - p1.X) / deltaY;
+                var incrementDepth = (depth2 - depth1) / deltaY;
+                var startY = Math.Max(p1.Y, 0);
+                var yOffset = startY - p1.Y;
+
+                var entry = new EdgeEntry
+                {
+                    YMax = p2.Y,
+                    X = p1.X + (incrementX * yOffset),
+                    IncrementX = incrementX,
+                    Depth = depth1 + (incrementDepth * yOffset),
+                    IncrementDepth = incrementDepth
+                };
+
+                if (!edgeTable.ContainsKey(startY))
+                {
+                    edgeTable[startY] = new List<EdgeEntry>();
+                }
+
+                edgeTable[startY].Add(entry);
+            }
+
+            var activeEdgeTable = new List<EdgeEntry>();
+            for (var y = firstVisibleY; y <= lastVisibleY; y++)
+            {
+                if (edgeTable.TryGetValue(y, out var startingEdges))
+                {
+                    activeEdgeTable.AddRange(startingEdges);
+                }
+
+                activeEdgeTable.RemoveAll(edge => edge.YMax == y);
+                activeEdgeTable.Sort((left, right) => left.X.CompareTo(right.X));
+
+                for (var i = 0; i + 1 < activeEdgeTable.Count; i += 2)
+                {
+                    var leftEdge = activeEdgeTable[i];
+                    var rightEdge = activeEdgeTable[i + 1];
+                    var xStart = (int)Math.Round(leftEdge.X);
+                    var xEnd = (int)Math.Round(rightEdge.X);
+
+                    if (xStart == xEnd)
                     {
                         continue;
                     }
 
-                    var depth = InterpolateDepth(
-                        weight0,
-                        weight1,
-                        weight2,
-                        first.Depth,
-                        second.Depth,
-                        third.Depth,
-                        useReciprocalDepthInterpolation);
+                    if (xStart > xEnd)
+                    {
+                        (xStart, xEnd) = (xEnd, xStart);
+                        (leftEdge, rightEdge) = (rightEdge, leftEdge);
+                    }
 
-                    TryWritePixel(x, y, width, height, depth, writeColor, colorArgb, DepthEpsilon);
+                    var clippedXStart = Math.Max(xStart, 0);
+                    var clippedXEnd = Math.Min(xEnd, width);
+                    if (clippedXStart >= clippedXEnd)
+                    {
+                        continue;
+                    }
+
+                    var spanWidth = xEnd - xStart;
+                    var depthIncrement = spanWidth == 0
+                        ? 0d
+                        : (rightEdge.Depth - leftEdge.Depth) / spanWidth;
+                    var depthSample = leftEdge.Depth + (depthIncrement * (clippedXStart - xStart));
+
+                    for (var x = clippedXStart; x < clippedXEnd; x++)
+                    {
+                        var depth = FromDepthSample(depthSample, face.UseReciprocalDepthInterpolation);
+                        TryWritePixel(x, y, width, height, depth, writeColor, colorArgb, DepthEpsilon);
+                        depthSample += depthIncrement;
+                    }
+                }
+
+                foreach (var edge in activeEdgeTable)
+                {
+                    edge.X += edge.IncrementX;
+                    edge.Depth += edge.IncrementDepth;
                 }
             }
         }
@@ -827,35 +871,23 @@ namespace _3d_graphics_editor.Rendering
             }
         }
 
-        private static float EdgeFunction(
-            float ax,
-            float ay,
-            float bx,
-            float by,
-            float px,
-            float py)
+        private static double ToDepthSample(float depth, bool useReciprocalDepthInterpolation)
         {
-            return ((px - ax) * (by - ay)) - ((py - ay) * (bx - ax));
+            return useReciprocalDepthInterpolation
+                ? 1d / depth
+                : depth;
         }
 
-        private static float InterpolateDepth(
-            float weight0,
-            float weight1,
-            float weight2,
-            float depth0,
-            float depth1,
-            float depth2,
-            bool useReciprocalDepthInterpolation)
+        private static float FromDepthSample(double depthSample, bool useReciprocalDepthInterpolation)
         {
             if (!useReciprocalDepthInterpolation)
             {
-                return (weight0 * depth0) + (weight1 * depth1) + (weight2 * depth2);
+                return (float)depthSample;
             }
 
-            var reciprocalDepth = (weight0 / depth0) + (weight1 / depth1) + (weight2 / depth2);
-            return reciprocalDepth <= 0.000001f
+            return depthSample <= 0.0000001d
                 ? float.PositiveInfinity
-                : 1f / reciprocalDepth;
+                : (float)(1d / depthSample);
         }
 
         public static unsafe void LineMidpoint(Bitmap bitmap, Point p1, Point p2, Color color)
@@ -1240,6 +1272,15 @@ namespace _3d_graphics_editor.Rendering
             ProjectionView View,
             string Label,
             Color AccentColor);
+
+        private sealed class EdgeEntry
+        {
+            public int YMax { get; set; }
+            public double X { get; set; }
+            public double IncrementX { get; set; }
+            public double Depth { get; set; }
+            public double IncrementDepth { get; set; }
+        }
 
         private readonly record struct Edge2D(PointF First, PointF Second)
         {
