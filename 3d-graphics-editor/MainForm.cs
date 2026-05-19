@@ -20,12 +20,16 @@ namespace _3d_graphics_editor
         private Point _lastMousePosition;
         private bool _isUpdatingAxisSelection;
         private bool _isUpdatingProjectionSelection;
+        private bool _projectionThumbnailsDirty;
+        private int _projectionThumbnailVersion;
         private SidebarView _sidebarView = SidebarView.Transform;
+        private readonly System.Windows.Forms.Timer _projectionThumbnailUpdateTimer = new();
 
         public MainForm()
         {
             InitializeComponent();
 
+            ConfigureProjectionThumbnailUpdateTimer();
             AttachEvents();
             ResetViewState();
             UpdateProjectionControlTexts();
@@ -76,6 +80,13 @@ namespace _3d_graphics_editor
             viewportPanel.MouseLeave += ViewportPanel_MouseLeave;
             viewportPanel.MouseWheel += ViewportPanel_MouseWheel;
             viewportPanel.MouseEnter += (_, _) => viewportPanel.Focus();
+            FormClosed += (_, _) => _projectionThumbnailUpdateTimer.Dispose();
+        }
+
+        private void ConfigureProjectionThumbnailUpdateTimer()
+        {
+            _projectionThumbnailUpdateTimer.Interval = 180;
+            _projectionThumbnailUpdateTimer.Tick += ProjectionThumbnailUpdateTimer_Tick;
         }
 
         private void OpenButton_Click(object? sender, EventArgs e)
@@ -102,6 +113,7 @@ namespace _3d_graphics_editor
 
                 _currentMesh = mesh;
                 ResetViewState();
+                RefreshProjectionThumbnails();
                 UpdateUiState();
                 viewportPanel.Focus();
                 viewportPanel.Invalidate();
@@ -121,6 +133,7 @@ namespace _3d_graphics_editor
         {
             _currentMesh = null;
             ResetViewState();
+            RefreshProjectionThumbnails();
             viewportPanel.Invalidate();
             UpdateUiState();
         }
@@ -128,6 +141,7 @@ namespace _3d_graphics_editor
         private void ResetViewButton_Click(object? sender, EventArgs e)
         {
             ResetViewState();
+            RefreshProjectionThumbnails();
             viewportPanel.Invalidate();
             UpdateUiState();
         }
@@ -162,6 +176,7 @@ namespace _3d_graphics_editor
                 showBackFacesCheckBox.Checked = false;
             }
 
+            RefreshProjectionThumbnails();
             viewportPanel.Invalidate();
             UpdateUiState();
         }
@@ -174,6 +189,7 @@ namespace _3d_graphics_editor
             }
 
             SyncProjectionSelection(radioButton);
+            RefreshProjectionThumbnails();
             viewportPanel.Invalidate();
             UpdateUiState();
         }
@@ -181,8 +197,15 @@ namespace _3d_graphics_editor
         private void ProjectionParameterControl_ValueChanged(object? sender, EventArgs e)
         {
             UpdateProjectionControlTexts();
+            RefreshProjectionThumbnails();
             viewportPanel.Invalidate();
             UpdateUiState();
+        }
+
+        private void ProjectionThumbnailUpdateTimer_Tick(object? sender, EventArgs e)
+        {
+            _projectionThumbnailUpdateTimer.Stop();
+            RefreshProjectionThumbnailsIfDirty();
         }
 
         private void SyncAxisGroup(CheckBox changedCheckBox, CheckBox allCheckBox, CheckBox xCheckBox, CheckBox yCheckBox, CheckBox zCheckBox)
@@ -300,8 +323,14 @@ namespace _3d_graphics_editor
 
         private void EndDragging()
         {
+            var wasDragging = _dragMode != DragMode.None;
             _dragMode = DragMode.None;
             viewportPanel.Cursor = _currentMesh is null ? Cursors.Default : Cursors.SizeAll;
+
+            if (wasDragging)
+            {
+                RefreshProjectionThumbnailsIfDirty();
+            }
         }
 
         private void RotateModel(int deltaX, int deltaY)
@@ -329,6 +358,7 @@ namespace _3d_graphics_editor
                 RotationZ = rotateZ ? _transform.RotationZ - (deltaX * MouseRotationFactor) : _transform.RotationZ
             };
 
+            MarkProjectionThumbnailsDirty();
             viewportPanel.Invalidate();
             UpdateUiState();
         }
@@ -356,6 +386,7 @@ namespace _3d_graphics_editor
                 TranslationZ = moveZ ? _transform.TranslationZ - (deltaY * MouseTranslationFactor) : _transform.TranslationZ
             };
 
+            MarkProjectionThumbnailsDirty();
             viewportPanel.Invalidate();
             UpdateUiState();
         }
@@ -384,6 +415,8 @@ namespace _3d_graphics_editor
                 ScaleZ = scaleZ ? Math.Clamp(_transform.ScaleZ * factor, MinScale, MaxScale) : _transform.ScaleZ
             };
 
+            MarkProjectionThumbnailsDirty();
+            ScheduleProjectionThumbnailRefresh();
             viewportPanel.Invalidate();
             UpdateUiState();
         }
@@ -391,6 +424,40 @@ namespace _3d_graphics_editor
         private void ResetViewState()
         {
             _transform = TransformState.Default;
+        }
+
+        private void MarkProjectionThumbnailsDirty()
+        {
+            _projectionThumbnailsDirty = true;
+        }
+
+        private void ScheduleProjectionThumbnailRefresh()
+        {
+            if (!showProjectionThumbnailsCheckBox.Checked)
+            {
+                return;
+            }
+
+            _projectionThumbnailUpdateTimer.Stop();
+            _projectionThumbnailUpdateTimer.Start();
+        }
+
+        private void RefreshProjectionThumbnails()
+        {
+            _projectionThumbnailUpdateTimer.Stop();
+            _projectionThumbnailsDirty = false;
+            _projectionThumbnailVersion++;
+        }
+
+        private void RefreshProjectionThumbnailsIfDirty()
+        {
+            if (!_projectionThumbnailsDirty)
+            {
+                return;
+            }
+
+            RefreshProjectionThumbnails();
+            viewportPanel.Invalidate();
         }
 
         private void UpdateUiState()
@@ -430,7 +497,8 @@ namespace _3d_graphics_editor
                 mode,
                 projection,
                 BuildProjectionParameters(),
-                showProjectionThumbnailsCheckBox.Checked);
+                showProjectionThumbnailsCheckBox.Checked,
+                _projectionThumbnailVersion);
         }
 
         private bool IsRotationSelector(CheckBox checkBox)

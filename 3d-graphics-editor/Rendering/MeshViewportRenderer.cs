@@ -37,6 +37,14 @@ namespace _3d_graphics_editor.Rendering
         private float[] _zBuffer = Array.Empty<float>();
         private int[] _colorBuffer = Array.Empty<int>();
         private Bitmap? _rasterBitmap;
+        private Bitmap? _projectionThumbnailCache;
+        private Mesh? _projectionThumbnailCacheMesh;
+        private int _projectionThumbnailCacheVersion = -1;
+        private Size _projectionThumbnailCacheSize;
+        private ProjectionView _projectionThumbnailCacheProjection;
+        private ProjectionParameters _projectionThumbnailCacheParameters;
+        private bool _projectionThumbnailCacheFillFaces;
+        private bool _projectionThumbnailCacheShowBackFaces;
 
         public void Render(
             Graphics graphics,
@@ -1249,38 +1257,104 @@ namespace _3d_graphics_editor.Rendering
             Rectangle renderBounds,
             ViewportRenderOptions options)
         {
-            var previews = new[]
+            var previews = CreateProjectionThumbnailDefinitions();
+            var layout = CalculateProjectionThumbnailLayout(renderBounds, previews.Length);
+            if (layout.TotalWidth <= 0 || layout.ThumbnailHeight <= 0)
             {
+                return;
+            }
+
+            if (!IsProjectionThumbnailCacheValid(mesh, layout, options))
+            {
+                RebuildProjectionThumbnailCache(mesh, transformedVertices, layout, previews, options);
+            }
+
+            graphics.DrawImageUnscaled(_projectionThumbnailCache!, layout.StartX, layout.Top);
+        }
+
+        private static ProjectionThumbnailDefinition[] CreateProjectionThumbnailDefinitions()
+        {
+            return
+            [
                 new ProjectionThumbnailDefinition(ProjectionView.Frontal, "Frontal", FrontalProjectionColor),
                 new ProjectionThumbnailDefinition(ProjectionView.Superior, "Superior", SuperiorProjectionColor),
                 new ProjectionThumbnailDefinition(ProjectionView.Lateral, "Lateral", LateralProjectionColor),
                 new ProjectionThumbnailDefinition(ProjectionView.Cavalier, "Cavaleira", CavalierProjectionColor),
                 new ProjectionThumbnailDefinition(ProjectionView.Cabinet, "Gabinete", CabinetProjectionColor),
                 new ProjectionThumbnailDefinition(ProjectionView.OnePointPerspective, "1 PF", OnePointPerspectiveColor)
-            };
+            ];
+        }
 
-            var thumbnailWidth = Math.Clamp(renderBounds.Width / (previews.Length + 1), 72, 112);
+        private static ProjectionThumbnailLayout CalculateProjectionThumbnailLayout(Rectangle renderBounds, int previewCount)
+        {
+            var thumbnailWidth = Math.Clamp(renderBounds.Width / (previewCount + 1), 72, 112);
             var thumbnailHeight = Math.Clamp(renderBounds.Height / 5, 72, 98);
-            var totalWidth = (thumbnailWidth * previews.Length) + (ThumbnailGap * (previews.Length - 1));
-            var startX = renderBounds.Right - 18 - totalWidth;
-            var top = renderBounds.Bottom - 18 - thumbnailHeight;
+            var totalWidth = (thumbnailWidth * previewCount) + (ThumbnailGap * (previewCount - 1));
+
+            return new ProjectionThumbnailLayout(
+                thumbnailWidth,
+                thumbnailHeight,
+                totalWidth,
+                renderBounds.Right - 18 - totalWidth,
+                renderBounds.Bottom - 18 - thumbnailHeight);
+        }
+
+        private bool IsProjectionThumbnailCacheValid(
+            Mesh mesh,
+            ProjectionThumbnailLayout layout,
+            ViewportRenderOptions options)
+        {
+            var cacheSize = new Size(layout.TotalWidth, layout.ThumbnailHeight);
+
+            return _projectionThumbnailCache is not null &&
+                   ReferenceEquals(_projectionThumbnailCacheMesh, mesh) &&
+                   _projectionThumbnailCacheVersion == options.ProjectionThumbnailVersion &&
+                   _projectionThumbnailCacheSize == cacheSize &&
+                   _projectionThumbnailCacheProjection == options.Projection &&
+                   _projectionThumbnailCacheParameters.Equals(options.Parameters) &&
+                   _projectionThumbnailCacheFillFaces == options.FillFaces &&
+                   _projectionThumbnailCacheShowBackFaces == options.ShowBackFaces;
+        }
+
+        private void RebuildProjectionThumbnailCache(
+            Mesh mesh,
+            Vector3D[] transformedVertices,
+            ProjectionThumbnailLayout layout,
+            ProjectionThumbnailDefinition[] previews,
+            ViewportRenderOptions options)
+        {
+            var cacheSize = new Size(layout.TotalWidth, layout.ThumbnailHeight);
+            _projectionThumbnailCache?.Dispose();
+            _projectionThumbnailCache = new Bitmap(cacheSize.Width, cacheSize.Height, PixelFormat.Format32bppArgb);
+
+            using var cacheGraphics = Graphics.FromImage(_projectionThumbnailCache);
+            cacheGraphics.SmoothingMode = SmoothingMode.AntiAlias;
+            cacheGraphics.Clear(Color.Transparent);
 
             for (var i = 0; i < previews.Length; i++)
             {
                 var thumbnailBounds = new Rectangle(
-                    startX + i * (thumbnailWidth + ThumbnailGap),
-                    top,
-                    thumbnailWidth,
-                    thumbnailHeight);
+                    i * (layout.ThumbnailWidth + ThumbnailGap),
+                    0,
+                    layout.ThumbnailWidth,
+                    layout.ThumbnailHeight);
 
                 DrawProjectionThumbnail(
-                    graphics,
+                    cacheGraphics,
                     mesh,
                     transformedVertices,
                     thumbnailBounds,
                     previews[i],
                     options);
             }
+
+            _projectionThumbnailCacheMesh = mesh;
+            _projectionThumbnailCacheVersion = options.ProjectionThumbnailVersion;
+            _projectionThumbnailCacheSize = cacheSize;
+            _projectionThumbnailCacheProjection = options.Projection;
+            _projectionThumbnailCacheParameters = options.Parameters;
+            _projectionThumbnailCacheFillFaces = options.FillFaces;
+            _projectionThumbnailCacheShowBackFaces = options.ShowBackFaces;
         }
 
         private void DrawProjectionThumbnail(
@@ -1500,6 +1574,13 @@ namespace _3d_graphics_editor.Rendering
             ProjectionView View,
             string Label,
             Color AccentColor);
+
+        private readonly record struct ProjectionThumbnailLayout(
+            int ThumbnailWidth,
+            int ThumbnailHeight,
+            int TotalWidth,
+            int StartX,
+            int Top);
 
         private sealed class EdgeEntry
         {

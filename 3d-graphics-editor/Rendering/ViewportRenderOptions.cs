@@ -33,9 +33,10 @@ namespace _3d_graphics_editor.Rendering
         ViewportMode Mode,
         ProjectionView Projection,
         ProjectionParameters Parameters,
-        bool ShowProjectionThumbnails)
+        bool ShowProjectionThumbnails,
+        int ProjectionThumbnailVersion)
     {
         public static ViewportRenderOptions Default =>
-            new(true, false, ViewportMode.Transform, ProjectionView.Normal, ProjectionParameters.Default, false);
+            new(true, false, ViewportMode.Transform, ProjectionView.Normal, ProjectionParameters.Default, false, 0);
     }
 }
