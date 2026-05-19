@@ -40,8 +40,13 @@ namespace _3d_graphics_editor
         private Label rotationHintLabel;
         private Label translationHintLabel;
         private Label scaleHintLabel;
+        private GroupBox orthographicProjectionGroupBox;
         private GroupBox projectionModeGroupBox;
         private RadioButton normalProjectionRadioButton;
+        private CheckBox showProjectionThumbnailsCheckBox;
+        private RadioButton frontalProjectionRadioButton;
+        private RadioButton superiorProjectionRadioButton;
+        private RadioButton lateralProjectionRadioButton;
         private RadioButton cavalierProjectionRadioButton;
         private RadioButton cabinetProjectionRadioButton;
         private RadioButton onePointPerspectiveRadioButton;
@@ -85,8 +90,13 @@ namespace _3d_graphics_editor
             sidebarPanel = new Panel();
             modeContentPanel = new Panel();
             projectionPagePanel = new Panel();
+            orthographicProjectionGroupBox = new GroupBox();
+            frontalProjectionRadioButton = new RadioButton();
+            superiorProjectionRadioButton = new RadioButton();
+            lateralProjectionRadioButton = new RadioButton();
             projectionModeGroupBox = new GroupBox();
             normalProjectionRadioButton = new RadioButton();
+            showProjectionThumbnailsCheckBox = new CheckBox();
             onePointPerspectiveRadioButton = new RadioButton();
             cabinetProjectionRadioButton = new RadioButton();
             cavalierProjectionRadioButton = new RadioButton();
@@ -133,6 +143,7 @@ namespace _3d_graphics_editor
             sidebarPanel.SuspendLayout();
             modeContentPanel.SuspendLayout();
             projectionPagePanel.SuspendLayout();
+            orthographicProjectionGroupBox.SuspendLayout();
             projectionModeGroupBox.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)obliqueAlphaTrackBar).BeginInit();
             ((System.ComponentModel.ISupportInitialize)obliqueRotationYTrackBar).BeginInit();
@@ -202,12 +213,56 @@ namespace _3d_graphics_editor
             //
             projectionPagePanel.Controls.Add(perspectiveProjectionGroupBox);
             projectionPagePanel.Controls.Add(projectionModeGroupBox);
+            projectionPagePanel.Controls.Add(orthographicProjectionGroupBox);
+            projectionPagePanel.Controls.Add(showProjectionThumbnailsCheckBox);
             projectionPagePanel.Controls.Add(normalProjectionRadioButton);
             projectionPagePanel.Location = new Point(0, 0);
             projectionPagePanel.Name = "projectionPagePanel";
             projectionPagePanel.Size = new Size(276, 470);
             projectionPagePanel.TabIndex = 1;
             projectionPagePanel.Visible = false;
+            //
+            // orthographicProjectionGroupBox
+            //
+            orthographicProjectionGroupBox.Controls.Add(lateralProjectionRadioButton);
+            orthographicProjectionGroupBox.Controls.Add(superiorProjectionRadioButton);
+            orthographicProjectionGroupBox.Controls.Add(frontalProjectionRadioButton);
+            orthographicProjectionGroupBox.Location = new Point(0, 34);
+            orthographicProjectionGroupBox.Name = "orthographicProjectionGroupBox";
+            orthographicProjectionGroupBox.Size = new Size(276, 82);
+            orthographicProjectionGroupBox.TabIndex = 1;
+            orthographicProjectionGroupBox.TabStop = false;
+            orthographicProjectionGroupBox.Text = "Projecoes ortograficas";
+            //
+            // lateralProjectionRadioButton
+            //
+            lateralProjectionRadioButton.AutoSize = true;
+            lateralProjectionRadioButton.Location = new Point(18, 51);
+            lateralProjectionRadioButton.Name = "lateralProjectionRadioButton";
+            lateralProjectionRadioButton.Size = new Size(85, 19);
+            lateralProjectionRadioButton.TabIndex = 2;
+            lateralProjectionRadioButton.Text = "Lateral (YZ)";
+            lateralProjectionRadioButton.UseVisualStyleBackColor = true;
+            //
+            // superiorProjectionRadioButton
+            //
+            superiorProjectionRadioButton.AutoSize = true;
+            superiorProjectionRadioButton.Location = new Point(140, 24);
+            superiorProjectionRadioButton.Name = "superiorProjectionRadioButton";
+            superiorProjectionRadioButton.Size = new Size(96, 19);
+            superiorProjectionRadioButton.TabIndex = 1;
+            superiorProjectionRadioButton.Text = "Superior (XZ)";
+            superiorProjectionRadioButton.UseVisualStyleBackColor = true;
+            //
+            // frontalProjectionRadioButton
+            //
+            frontalProjectionRadioButton.AutoSize = true;
+            frontalProjectionRadioButton.Location = new Point(18, 24);
+            frontalProjectionRadioButton.Name = "frontalProjectionRadioButton";
+            frontalProjectionRadioButton.Size = new Size(90, 19);
+            frontalProjectionRadioButton.TabIndex = 0;
+            frontalProjectionRadioButton.Text = "Frontal (XY)";
+            frontalProjectionRadioButton.UseVisualStyleBackColor = true;
             //
             // projectionModeGroupBox
             //
@@ -217,10 +272,10 @@ namespace _3d_graphics_editor
             projectionModeGroupBox.Controls.Add(obliqueAlphaLabel);
             projectionModeGroupBox.Controls.Add(cabinetProjectionRadioButton);
             projectionModeGroupBox.Controls.Add(cavalierProjectionRadioButton);
-            projectionModeGroupBox.Location = new Point(0, 34);
+            projectionModeGroupBox.Location = new Point(0, 126);
             projectionModeGroupBox.Name = "projectionModeGroupBox";
-            projectionModeGroupBox.Size = new Size(276, 184);
-            projectionModeGroupBox.TabIndex = 1;
+            projectionModeGroupBox.Size = new Size(276, 154);
+            projectionModeGroupBox.TabIndex = 2;
             projectionModeGroupBox.TabStop = false;
             projectionModeGroupBox.Text = "Projecoes obliquas";
             //
@@ -236,10 +291,20 @@ namespace _3d_graphics_editor
             normalProjectionRadioButton.Text = "Normal (XYZ)";
             normalProjectionRadioButton.UseVisualStyleBackColor = true;
             //
+            // showProjectionThumbnailsCheckBox
+            //
+            showProjectionThumbnailsCheckBox.AutoSize = true;
+            showProjectionThumbnailsCheckBox.Location = new Point(130, 8);
+            showProjectionThumbnailsCheckBox.Name = "showProjectionThumbnailsCheckBox";
+            showProjectionThumbnailsCheckBox.Size = new Size(130, 19);
+            showProjectionThumbnailsCheckBox.TabIndex = 4;
+            showProjectionThumbnailsCheckBox.Text = "Mostrar miniaturas";
+            showProjectionThumbnailsCheckBox.UseVisualStyleBackColor = true;
+            //
             // obliqueRotationYTrackBar
             //
             obliqueRotationYTrackBar.AutoSize = false;
-            obliqueRotationYTrackBar.Location = new Point(18, 136);
+            obliqueRotationYTrackBar.Location = new Point(18, 120);
             obliqueRotationYTrackBar.Maximum = 180;
             obliqueRotationYTrackBar.Minimum = -180;
             obliqueRotationYTrackBar.Name = "obliqueRotationYTrackBar";
@@ -250,7 +315,7 @@ namespace _3d_graphics_editor
             // obliqueRotationYLabel
             //
             obliqueRotationYLabel.ForeColor = Color.FromArgb(61, 73, 89);
-            obliqueRotationYLabel.Location = new Point(18, 116);
+            obliqueRotationYLabel.Location = new Point(18, 100);
             obliqueRotationYLabel.Name = "obliqueRotationYLabel";
             obliqueRotationYLabel.Size = new Size(240, 17);
             obliqueRotationYLabel.TabIndex = 4;
@@ -259,7 +324,7 @@ namespace _3d_graphics_editor
             // obliqueAlphaTrackBar
             //
             obliqueAlphaTrackBar.AutoSize = false;
-            obliqueAlphaTrackBar.Location = new Point(18, 84);
+            obliqueAlphaTrackBar.Location = new Point(18, 72);
             obliqueAlphaTrackBar.Maximum = 90;
             obliqueAlphaTrackBar.Minimum = 0;
             obliqueAlphaTrackBar.Name = "obliqueAlphaTrackBar";
@@ -271,7 +336,7 @@ namespace _3d_graphics_editor
             // obliqueAlphaLabel
             //
             obliqueAlphaLabel.ForeColor = Color.FromArgb(61, 73, 89);
-            obliqueAlphaLabel.Location = new Point(18, 64);
+            obliqueAlphaLabel.Location = new Point(18, 52);
             obliqueAlphaLabel.Name = "obliqueAlphaLabel";
             obliqueAlphaLabel.Size = new Size(240, 17);
             obliqueAlphaLabel.TabIndex = 2;
@@ -316,10 +381,10 @@ namespace _3d_graphics_editor
             perspectiveProjectionGroupBox.Controls.Add(perspectiveRotationXTrackBar);
             perspectiveProjectionGroupBox.Controls.Add(perspectiveRotationXLabel);
             perspectiveProjectionGroupBox.Controls.Add(onePointPerspectiveRadioButton);
-            perspectiveProjectionGroupBox.Location = new Point(0, 228);
+            perspectiveProjectionGroupBox.Location = new Point(0, 292);
             perspectiveProjectionGroupBox.Name = "perspectiveProjectionGroupBox";
             perspectiveProjectionGroupBox.Size = new Size(276, 178);
-            perspectiveProjectionGroupBox.TabIndex = 2;
+            perspectiveProjectionGroupBox.TabIndex = 3;
             perspectiveProjectionGroupBox.TabStop = false;
             perspectiveProjectionGroupBox.Text = "Projecao de perspectiva 1 ponto de fuga";
             //
@@ -706,6 +771,8 @@ namespace _3d_graphics_editor
             sidebarPanel.ResumeLayout(false);
             modeContentPanel.ResumeLayout(false);
             projectionPagePanel.ResumeLayout(false);
+            orthographicProjectionGroupBox.ResumeLayout(false);
+            orthographicProjectionGroupBox.PerformLayout();
             projectionModeGroupBox.ResumeLayout(false);
             projectionModeGroupBox.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)obliqueAlphaTrackBar).EndInit();

@@ -54,7 +54,11 @@ namespace _3d_graphics_editor
             scaleAllCheckBox.CheckedChanged += AxisSelector_CheckedChanged;
             fillFacesCheckBox.CheckedChanged += RenderOptionCheckBox_CheckedChanged;
             showBackFacesCheckBox.CheckedChanged += RenderOptionCheckBox_CheckedChanged;
+            showProjectionThumbnailsCheckBox.CheckedChanged += RenderOptionCheckBox_CheckedChanged;
             normalProjectionRadioButton.CheckedChanged += ProjectionSelector_CheckedChanged;
+            frontalProjectionRadioButton.CheckedChanged += ProjectionSelector_CheckedChanged;
+            superiorProjectionRadioButton.CheckedChanged += ProjectionSelector_CheckedChanged;
+            lateralProjectionRadioButton.CheckedChanged += ProjectionSelector_CheckedChanged;
             cavalierProjectionRadioButton.CheckedChanged += ProjectionSelector_CheckedChanged;
             cabinetProjectionRadioButton.CheckedChanged += ProjectionSelector_CheckedChanged;
             onePointPerspectiveRadioButton.CheckedChanged += ProjectionSelector_CheckedChanged;
@@ -210,6 +214,9 @@ namespace _3d_graphics_editor
             try
             {
                 normalProjectionRadioButton.Checked = selectedRadioButton == normalProjectionRadioButton;
+                frontalProjectionRadioButton.Checked = selectedRadioButton == frontalProjectionRadioButton;
+                superiorProjectionRadioButton.Checked = selectedRadioButton == superiorProjectionRadioButton;
+                lateralProjectionRadioButton.Checked = selectedRadioButton == lateralProjectionRadioButton;
                 cavalierProjectionRadioButton.Checked = selectedRadioButton == cavalierProjectionRadioButton;
                 cabinetProjectionRadioButton.Checked = selectedRadioButton == cabinetProjectionRadioButton;
                 onePointPerspectiveRadioButton.Checked = selectedRadioButton == onePointPerspectiveRadioButton;
@@ -396,10 +403,12 @@ namespace _3d_graphics_editor
             rotationGroupBox.Enabled = hasMesh;
             translationGroupBox.Enabled = hasMesh;
             scaleGroupBox.Enabled = hasMesh;
+            orthographicProjectionGroupBox.Enabled = hasMesh;
             projectionModeGroupBox.Enabled = hasMesh;
             perspectiveProjectionGroupBox.Enabled = hasMesh;
             fillFacesCheckBox.Enabled = hasMesh;
             showBackFacesCheckBox.Enabled = hasMesh && !fillFacesCheckBox.Checked;
+            showProjectionThumbnailsCheckBox.Enabled = hasMesh;
             viewportPanel.Cursor = hasMesh ? Cursors.SizeAll : Cursors.Default;
             UpdateProjectionControlAvailability(hasMesh);
             UpdateSidebarViewState();
@@ -420,7 +429,8 @@ namespace _3d_graphics_editor
                 showBackFacesCheckBox.Checked,
                 mode,
                 projection,
-                BuildProjectionParameters());
+                BuildProjectionParameters(),
+                showProjectionThumbnailsCheckBox.Checked);
         }
 
         private bool IsRotationSelector(CheckBox checkBox)
@@ -513,6 +523,21 @@ namespace _3d_graphics_editor
                 return ProjectionView.Normal;
             }
 
+            if (frontalProjectionRadioButton.Checked)
+            {
+                return ProjectionView.Frontal;
+            }
+
+            if (superiorProjectionRadioButton.Checked)
+            {
+                return ProjectionView.Superior;
+            }
+
+            if (lateralProjectionRadioButton.Checked)
+            {
+                return ProjectionView.Lateral;
+            }
+
             if (cabinetProjectionRadioButton.Checked)
             {
                 return ProjectionView.Cabinet;
@@ -539,6 +564,9 @@ namespace _3d_graphics_editor
         private void UpdateProjectionControlAvailability(bool hasMesh)
         {
             normalProjectionRadioButton.Enabled = hasMesh;
+            frontalProjectionRadioButton.Enabled = hasMesh;
+            superiorProjectionRadioButton.Enabled = hasMesh;
+            lateralProjectionRadioButton.Enabled = hasMesh;
             cavalierProjectionRadioButton.Enabled = hasMesh;
             cabinetProjectionRadioButton.Enabled = hasMesh;
             onePointPerspectiveRadioButton.Enabled = hasMesh;

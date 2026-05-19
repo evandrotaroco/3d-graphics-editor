@@ -27,6 +27,9 @@ namespace _3d_graphics_editor.Rendering
         private static readonly Color EdgeColor = Color.FromArgb(34, 47, 66);
         private static readonly Color PlaceholderColor = Color.FromArgb(92, 108, 126);
         private static readonly Color DefaultFaceColor = Color.FromArgb(188, 205, 226);
+        private static readonly Color FrontalProjectionColor = Color.FromArgb(55, 113, 196);
+        private static readonly Color SuperiorProjectionColor = Color.FromArgb(133, 90, 181);
+        private static readonly Color LateralProjectionColor = Color.FromArgb(189, 116, 34);
         private static readonly Color CavalierProjectionColor = Color.FromArgb(181, 58, 66);
         private static readonly Color CabinetProjectionColor = Color.FromArgb(41, 141, 77);
         private static readonly Color OnePointPerspectiveColor = Color.FromArgb(46, 101, 185);
@@ -95,7 +98,10 @@ namespace _3d_graphics_editor.Rendering
             if (options.Mode == ViewportMode.Projection)
             {
                 DrawProjectionModeBadge(graphics, renderBounds, mainProjection, options.Parameters);
-                DrawProjectionThumbnails(graphics, mesh, transformedVertices, renderBounds, options);
+                if (options.ShowProjectionThumbnails)
+                {
+                    DrawProjectionThumbnails(graphics, mesh, transformedVertices, renderBounds, options);
+                }
             }
         }
 
@@ -372,11 +378,38 @@ namespace _3d_graphics_editor.Rendering
         {
             return projection switch
             {
+                ProjectionView.Frontal => TryProjectOrthographic(point, bounds, projection, out projectedPoint),
+                ProjectionView.Superior => TryProjectOrthographic(point, bounds, projection, out projectedPoint),
+                ProjectionView.Lateral => TryProjectOrthographic(point, bounds, projection, out projectedPoint),
                 ProjectionView.Cavalier => TryProjectOblique(point, bounds, CavalierDepthFactor, parameters.ObliqueAlphaDegrees, out projectedPoint),
                 ProjectionView.Cabinet => TryProjectOblique(point, bounds, CabinetDepthFactor, parameters.ObliqueAlphaDegrees, out projectedPoint),
                 ProjectionView.OnePointPerspective => TryProjectOnePointPerspective(point, bounds, FixedOnePointFocalDistance, out projectedPoint),
                 _ => TryProjectStandardPerspective(point, bounds, out projectedPoint)
             };
+        }
+
+        private static bool TryProjectOrthographic(
+            Vector3D point,
+            Rectangle bounds,
+            ProjectionView projection,
+            out PointF projectedPoint)
+        {
+            var (horizontal, vertical) = projection switch
+            {
+                ProjectionView.Superior => (point.X, point.Z),
+                ProjectionView.Lateral => (point.Y, point.Z),
+                _ => (point.X, point.Y)
+            };
+
+            var projectionScale = Math.Min(bounds.Width, bounds.Height) * ParallelProjectionScaleFactor;
+            var centerX = bounds.Left + bounds.Width / 2f;
+            var centerY = bounds.Top + bounds.Height / 2f;
+
+            projectedPoint = new PointF(
+                centerX + horizontal * projectionScale,
+                centerY - vertical * projectionScale);
+
+            return true;
         }
 
         private static bool TryProjectStandardPerspective(
@@ -473,6 +506,11 @@ namespace _3d_graphics_editor.Rendering
                 return Dot(facePoint, geometricNormal) < 0f;
             }
 
+            if (IsOrthographicProjection(projection))
+            {
+                return Dot(GetOrthographicProjectionDirection(projection), geometricNormal) < 0f;
+            }
+
             var viewVector = GetObliqueProjectionDirection(projection, parameters);
 
             return Dot(viewVector, geometricNormal) < 0f;
@@ -480,6 +518,11 @@ namespace _3d_graphics_editor.Rendering
 
         private static float GetDepthValue(Vector3D point, ProjectionView projection, ProjectionParameters parameters)
         {
+            if (IsOrthographicProjection(projection))
+            {
+                return Dot(point, GetOrthographicProjectionDirection(projection));
+            }
+
             if (projection == ProjectionView.Cavalier || projection == ProjectionView.Cabinet)
             {
                 return Dot(point, GetObliqueProjectionDirection(projection, parameters));
@@ -1208,13 +1251,16 @@ namespace _3d_graphics_editor.Rendering
         {
             var previews = new[]
             {
+                new ProjectionThumbnailDefinition(ProjectionView.Frontal, "Frontal", FrontalProjectionColor),
+                new ProjectionThumbnailDefinition(ProjectionView.Superior, "Superior", SuperiorProjectionColor),
+                new ProjectionThumbnailDefinition(ProjectionView.Lateral, "Lateral", LateralProjectionColor),
                 new ProjectionThumbnailDefinition(ProjectionView.Cavalier, "Cavaleira", CavalierProjectionColor),
                 new ProjectionThumbnailDefinition(ProjectionView.Cabinet, "Gabinete", CabinetProjectionColor),
                 new ProjectionThumbnailDefinition(ProjectionView.OnePointPerspective, "1 PF", OnePointPerspectiveColor)
             };
 
-            var thumbnailWidth = Math.Clamp(renderBounds.Width / 6, 92, 124);
-            var thumbnailHeight = Math.Clamp(renderBounds.Height / 5, 76, 108);
+            var thumbnailWidth = Math.Clamp(renderBounds.Width / (previews.Length + 1), 72, 112);
+            var thumbnailHeight = Math.Clamp(renderBounds.Height / 5, 72, 98);
             var totalWidth = (thumbnailWidth * previews.Length) + (ThumbnailGap * (previews.Length - 1));
             var startX = renderBounds.Right - 18 - totalWidth;
             var top = renderBounds.Bottom - 18 - thumbnailHeight;
@@ -1298,6 +1344,9 @@ namespace _3d_graphics_editor.Rendering
             return projection switch
             {
                 ProjectionView.Normal => "Normal (XYZ)",
+                ProjectionView.Frontal => "Frontal (XY)",
+                ProjectionView.Superior => "Superior (XZ)",
+                ProjectionView.Lateral => "Lateral (YZ)",
                 ProjectionView.Cavalier => "Cavaleira",
                 ProjectionView.Cabinet => "Gabinete",
                 ProjectionView.OnePointPerspective => "Perspectiva 1 PF",
@@ -1309,6 +1358,12 @@ namespace _3d_graphics_editor.Rendering
         {
             return projection switch
             {
+                ProjectionView.Frontal =>
+                    "Frontal | plano XY | profundidade Z",
+                ProjectionView.Superior =>
+                    "Superior | plano XZ | profundidade Y",
+                ProjectionView.Lateral =>
+                    "Lateral | plano YZ | profundidade X",
                 ProjectionView.Cavalier =>
                     $"Cavaleira | L=1.0 | a={parameters.ObliqueAlphaDegrees:F0} deg",
                 ProjectionView.Cabinet =>
@@ -1325,6 +1380,21 @@ namespace _3d_graphics_editor.Rendering
             // para que a 1 PF nunca encoste demais no plano de projecao, mas
             // ainda preserve o efeito visual do z offset.
             return PerspectiveBaseDepthOffset + (zOffset / 100f);
+        }
+
+        private static bool IsOrthographicProjection(ProjectionView projection)
+        {
+            return projection is ProjectionView.Frontal or ProjectionView.Superior or ProjectionView.Lateral;
+        }
+
+        private static Vector3D GetOrthographicProjectionDirection(ProjectionView projection)
+        {
+            return projection switch
+            {
+                ProjectionView.Superior => new Vector3D(0f, -1f, 0f),
+                ProjectionView.Lateral => new Vector3D(-1f, 0f, 0f),
+                _ => new Vector3D(0f, 0f, 1f)
+            };
         }
 
         private static Vector3D GetObliqueProjectionDirection(ProjectionView projection, ProjectionParameters parameters)

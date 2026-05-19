@@ -9,6 +9,9 @@ namespace _3d_graphics_editor.Rendering
     public enum ProjectionView
     {
         Normal,
+        Frontal,
+        Superior,
+        Lateral,
         Cavalier,
         Cabinet,
         OnePointPerspective
@@ -29,9 +32,10 @@ namespace _3d_graphics_editor.Rendering
         bool ShowBackFaces,
         ViewportMode Mode,
         ProjectionView Projection,
-        ProjectionParameters Parameters)
+        ProjectionParameters Parameters,
+        bool ShowProjectionThumbnails)
     {
         public static ViewportRenderOptions Default =>
-            new(true, false, ViewportMode.Transform, ProjectionView.Normal, ProjectionParameters.Default);
+            new(true, false, ViewportMode.Transform, ProjectionView.Normal, ProjectionParameters.Default, false);
     }
 }
