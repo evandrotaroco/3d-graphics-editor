@@ -17,6 +17,7 @@ namespace _3d_graphics_editor.Rendering
         private const float CabinetDepthFactor = 0.5f;
         private const float PerspectiveBaseDepthOffset = 2f;
         private const float DepthEpsilon = 0.0001f;
+        private const float EdgeDepthEpsilon = 0.01f;
         private const int ThumbnailGap = 10;
         private const int TransparentPixel = 0;
         private static readonly Color BackgroundTopColor = Color.FromArgb(250, 252, 255);
@@ -77,7 +78,14 @@ namespace _3d_graphics_editor.Rendering
                 options.ShowBackFaces,
                 options.Parameters);
 
-            DrawProjectedMesh(graphics, renderableFaces, renderBounds, options.FillFaces, EdgeColor, null);
+            DrawProjectedMesh(
+                graphics,
+                renderableFaces,
+                renderBounds,
+                options.FillFaces,
+                options.ShowBackFaces,
+                EdgeColor,
+                null);
 
             if (mainProjection == ProjectionView.OnePointPerspective)
             {
@@ -490,6 +498,7 @@ namespace _3d_graphics_editor.Rendering
             IReadOnlyList<RenderableFace> renderableFaces,
             Rectangle bounds,
             bool fillFaces,
+            bool showBackFaces,
             Color edgeColor,
             Color? uniformFillColor)
         {
@@ -498,9 +507,16 @@ namespace _3d_graphics_editor.Rendering
                 return;
             }
 
-            if (fillFaces)
+            if (fillFaces || !showBackFaces)
             {
-                DrawZBufferedMesh(graphics, renderableFaces, bounds, true, edgeColor, uniformFillColor);
+                DrawZBufferedMesh(
+                    graphics,
+                    renderableFaces,
+                    bounds,
+                    fillFaces,
+                    !showBackFaces,
+                    edgeColor,
+                    uniformFillColor);
                 return;
             }
 
@@ -512,6 +528,7 @@ namespace _3d_graphics_editor.Rendering
             IReadOnlyList<RenderableFace> renderableFaces,
             Rectangle bounds,
             bool fillFaces,
+            bool depthTestEdges,
             Color edgeColor,
             Color? uniformFillColor)
         {
@@ -530,7 +547,7 @@ namespace _3d_graphics_editor.Rendering
             }
 
             CopyColorBufferToBitmap(width, height);
-            DrawEdgeOverlay(renderableFaces, bounds, width, height, edgeColor);
+            DrawEdgeOverlay(renderableFaces, bounds, width, height, depthTestEdges, edgeColor);
 
             graphics.DrawImage(
                 _rasterBitmap!,
@@ -768,6 +785,7 @@ namespace _3d_graphics_editor.Rendering
             Rectangle bounds,
             int width,
             int height,
+            bool depthTestEdges,
             Color edgeColor)
         {
             var bitmapData = _rasterBitmap!.LockBits(
@@ -787,23 +805,40 @@ namespace _3d_graphics_editor.Rendering
                     for (var i = 0; i < face.ScreenVertices.Length; i++)
                     {
                         var nextIndex = (i + 1) % face.ScreenVertices.Length;
-                        var start = face.ScreenVertices[i].Point;
-                        var end = face.ScreenVertices[nextIndex].Point;
-                        var edge = new Edge2D(start, end);
+                        var start = face.ScreenVertices[i];
+                        var end = face.ScreenVertices[nextIndex];
+                        var edge = new Edge2D(start.Point, end.Point);
 
                         if (!drawnEdges.Add(edge))
                         {
                             continue;
                         }
 
-                        DrawLineMidpoint(
-                            scan0,
-                            stride,
-                            width,
-                            height,
-                            ToBitmapPoint(start, bounds),
-                            ToBitmapPoint(end, bounds),
-                            edgeColor);
+                        if (depthTestEdges)
+                        {
+                            DrawDepthTestedLineMidpoint(
+                                scan0,
+                                stride,
+                                width,
+                                height,
+                                ToBitmapPoint(start.Point, bounds),
+                                ToBitmapPoint(end.Point, bounds),
+                                start.Depth,
+                                end.Depth,
+                                face.UseReciprocalDepthInterpolation,
+                                edgeColor);
+                        }
+                        else
+                        {
+                            DrawLineMidpoint(
+                                scan0,
+                                stride,
+                                width,
+                                height,
+                                ToBitmapPoint(start.Point, bounds),
+                                ToBitmapPoint(end.Point, bounds),
+                                edgeColor);
+                        }
                     }
                 }
             }
@@ -811,6 +846,128 @@ namespace _3d_graphics_editor.Rendering
             {
                 _rasterBitmap.UnlockBits(bitmapData);
             }
+        }
+
+        private unsafe void DrawDepthTestedLineMidpoint(
+            byte* scan0,
+            int stride,
+            int width,
+            int height,
+            Point p1,
+            Point p2,
+            float startDepth,
+            float endDepth,
+            bool useReciprocalDepthInterpolation,
+            Color color)
+        {
+            var x1 = p1.X;
+            var y1 = p1.Y;
+            var x2 = p2.X;
+            var y2 = p2.Y;
+
+            var dx = x2 - x1;
+            var dy = y2 - y1;
+
+            var passoX = 1;
+            var passoY = 1;
+
+            if (dx < 0)
+            {
+                passoX = -1;
+                dx = -dx;
+            }
+
+            if (dy < 0)
+            {
+                passoY = -1;
+                dy = -dy;
+            }
+
+            var startDepthSample = ToDepthSample(startDepth, useReciprocalDepthInterpolation);
+            var endDepthSample = ToDepthSample(endDepth, useReciprocalDepthInterpolation);
+            var totalSteps = Math.Max(dx, dy);
+            var depthIncrement = totalSteps == 0
+                ? 0d
+                : (endDepthSample - startDepthSample) / totalSteps;
+            var depthSample = startDepthSample;
+
+            var x = x1;
+            var y = y1;
+
+            if (dx >= dy)
+            {
+                var d = (2 * dy) - dx;
+                var incE = 2 * dy;
+                var incNE = 2 * (dy - dx);
+
+                for (var i = 0; i <= dx; i++)
+                {
+                    var depth = FromDepthSample(depthSample, useReciprocalDepthInterpolation);
+                    SetPixelSafeWhenVisible(scan0, stride, width, height, x, y, depth, color);
+
+                    if (d < 0)
+                    {
+                        d += incE;
+                    }
+                    else
+                    {
+                        d += incNE;
+                        y += passoY;
+                    }
+
+                    x += passoX;
+                    depthSample += depthIncrement;
+                }
+            }
+            else
+            {
+                var d = (2 * dx) - dy;
+                var incE = 2 * dx;
+                var incNE = 2 * (dx - dy);
+
+                for (var i = 0; i <= dy; i++)
+                {
+                    var depth = FromDepthSample(depthSample, useReciprocalDepthInterpolation);
+                    SetPixelSafeWhenVisible(scan0, stride, width, height, x, y, depth, color);
+
+                    if (d < 0)
+                    {
+                        d += incE;
+                    }
+                    else
+                    {
+                        d += incNE;
+                        x += passoX;
+                    }
+
+                    y += passoY;
+                    depthSample += depthIncrement;
+                }
+            }
+        }
+
+        private unsafe void SetPixelSafeWhenVisible(
+            byte* scan0,
+            int stride,
+            int width,
+            int height,
+            int x,
+            int y,
+            float depth,
+            Color color)
+        {
+            if (x < 0 || x >= width || y < 0 || y >= height || float.IsNaN(depth))
+            {
+                return;
+            }
+
+            var index = (y * width) + x;
+            if (depth > _zBuffer[index] + EdgeDepthEpsilon)
+            {
+                return;
+            }
+
+            SetPixelSafe(scan0, stride, width, height, x, y, color);
         }
 
         private void TryWritePixel(
@@ -1126,6 +1283,7 @@ namespace _3d_graphics_editor.Rendering
                 renderableFaces,
                 previewCanvas,
                 options.FillFaces,
+                options.ShowBackFaces,
                 preview.AccentColor,
                 overlayFillColor);
 
