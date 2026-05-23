@@ -29,10 +29,12 @@ namespace _3d_graphics_editor
         {
             InitializeComponent();
 
+            ApplyColorButtonTextColor(lightColorButton);
             ConfigureProjectionThumbnailUpdateTimer();
             AttachEvents();
             ResetViewState();
             UpdateProjectionControlTexts();
+            UpdateLightingControlTexts();
             UpdateUiState();
         }
 
@@ -43,6 +45,7 @@ namespace _3d_graphics_editor
             resetViewButton.Click += ResetViewButton_Click;
             transformViewButton.Click += (_, _) => SwitchSidebarView(SidebarView.Transform);
             projectionViewButton.Click += (_, _) => SwitchSidebarView(SidebarView.Projection);
+            lightingViewButton.Click += (_, _) => SwitchSidebarView(SidebarView.Lighting);
 
             rotationXCheckBox.CheckedChanged += AxisSelector_CheckedChanged;
             rotationYCheckBox.CheckedChanged += AxisSelector_CheckedChanged;
@@ -57,6 +60,7 @@ namespace _3d_graphics_editor
             scaleZCheckBox.CheckedChanged += AxisSelector_CheckedChanged;
             scaleAllCheckBox.CheckedChanged += AxisSelector_CheckedChanged;
             fillFacesCheckBox.CheckedChanged += RenderOptionCheckBox_CheckedChanged;
+            showEdgesCheckBox.CheckedChanged += RenderOptionCheckBox_CheckedChanged;
             showBackFacesCheckBox.CheckedChanged += RenderOptionCheckBox_CheckedChanged;
             showProjectionThumbnailsCheckBox.CheckedChanged += RenderOptionCheckBox_CheckedChanged;
             normalProjectionRadioButton.CheckedChanged += ProjectionSelector_CheckedChanged;
@@ -71,6 +75,17 @@ namespace _3d_graphics_editor
             perspectiveRotationXTrackBar.ValueChanged += ProjectionParameterControl_ValueChanged;
             perspectiveRotationYTrackBar.ValueChanged += ProjectionParameterControl_ValueChanged;
             perspectiveZOffsetTrackBar.ValueChanged += ProjectionParameterControl_ValueChanged;
+            flatShadingRadioButton.CheckedChanged += LightingControl_ValueChanged;
+            gouraudShadingRadioButton.CheckedChanged += LightingControl_ValueChanged;
+            phongShadingRadioButton.CheckedChanged += LightingControl_ValueChanged;
+            ambientIntensityTrackBar.ValueChanged += LightingControl_ValueChanged;
+            diffuseIntensityTrackBar.ValueChanged += LightingControl_ValueChanged;
+            specularIntensityTrackBar.ValueChanged += LightingControl_ValueChanged;
+            shininessTrackBar.ValueChanged += LightingControl_ValueChanged;
+            lightXTrackBar.ValueChanged += LightingControl_ValueChanged;
+            lightYTrackBar.ValueChanged += LightingControl_ValueChanged;
+            lightZTrackBar.ValueChanged += LightingControl_ValueChanged;
+            lightColorButton.Click += (_, _) => ChooseLightingColor(lightColorButton);
 
             viewportPanel.Paint += ViewportPanel_Paint;
             viewportPanel.Resize += (_, _) => viewportPanel.Invalidate();
@@ -200,6 +215,42 @@ namespace _3d_graphics_editor
             RefreshProjectionThumbnails();
             viewportPanel.Invalidate();
             UpdateUiState();
+        }
+
+        private void LightingControl_ValueChanged(object? sender, EventArgs e)
+        {
+            UpdateLightingControlTexts();
+            viewportPanel.Invalidate();
+            UpdateUiState();
+        }
+
+        private void ChooseLightingColor(Button colorButton)
+        {
+            using var dialog = new ColorDialog
+            {
+                AllowFullOpen = true,
+                AnyColor = true,
+                Color = colorButton.BackColor,
+                FullOpen = true
+            };
+
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+            {
+                return;
+            }
+
+            colorButton.BackColor = dialog.Color;
+            ApplyColorButtonTextColor(colorButton);
+            viewportPanel.Invalidate();
+            UpdateUiState();
+        }
+
+        private static void ApplyColorButtonTextColor(Button button)
+        {
+            var luminance = (0.299f * button.BackColor.R) +
+                            (0.587f * button.BackColor.G) +
+                            (0.114f * button.BackColor.B);
+            button.ForeColor = luminance > 150f ? Color.FromArgb(28, 36, 45) : Color.White;
         }
 
         private void ProjectionThumbnailUpdateTimer_Tick(object? sender, EventArgs e)
@@ -473,7 +524,13 @@ namespace _3d_graphics_editor
             orthographicProjectionGroupBox.Enabled = hasMesh;
             projectionModeGroupBox.Enabled = hasMesh;
             perspectiveProjectionGroupBox.Enabled = hasMesh;
+            shadingGroupBox.Enabled = hasMesh;
+            ambientLightingGroupBox.Enabled = hasMesh;
+            diffuseLightingGroupBox.Enabled = hasMesh;
+            specularLightingGroupBox.Enabled = hasMesh;
+            lightPositionGroupBox.Enabled = hasMesh;
             fillFacesCheckBox.Enabled = hasMesh;
+            showEdgesCheckBox.Enabled = hasMesh;
             showBackFacesCheckBox.Enabled = hasMesh && !fillFacesCheckBox.Checked;
             showProjectionThumbnailsCheckBox.Enabled = hasMesh;
             viewportPanel.Cursor = hasMesh ? Cursors.SizeAll : Cursors.Default;
@@ -493,12 +550,15 @@ namespace _3d_graphics_editor
 
             return new ViewportRenderOptions(
                 fillFacesCheckBox.Checked,
+                showEdgesCheckBox.Checked,
                 showBackFacesCheckBox.Checked,
                 mode,
                 projection,
                 BuildProjectionParameters(),
                 showProjectionThumbnailsCheckBox.Checked,
-                _projectionThumbnailVersion);
+                _projectionThumbnailVersion,
+                GetSelectedShadingMode(),
+                BuildLightingOptions());
         }
 
         private bool IsRotationSelector(CheckBox checkBox)
@@ -565,12 +625,16 @@ namespace _3d_graphics_editor
         private void UpdateSidebarViewState()
         {
             var isTransformView = _sidebarView == SidebarView.Transform;
+            var isProjectionView = _sidebarView == SidebarView.Projection;
+            var isLightingView = _sidebarView == SidebarView.Lighting;
 
             transformPagePanel.Visible = isTransformView;
-            projectionPagePanel.Visible = !isTransformView;
+            projectionPagePanel.Visible = isProjectionView;
+            lightingPagePanel.Visible = isLightingView;
 
             ApplySidebarButtonStyle(transformViewButton, isTransformView);
-            ApplySidebarButtonStyle(projectionViewButton, !isTransformView);
+            ApplySidebarButtonStyle(projectionViewButton, isProjectionView);
+            ApplySidebarButtonStyle(lightingViewButton, isLightingView);
         }
 
         private static void ApplySidebarButtonStyle(Button button, bool isActive)
@@ -629,6 +693,34 @@ namespace _3d_graphics_editor
                 perspectiveZOffsetTrackBar.Value);
         }
 
+        private ShadingMode GetSelectedShadingMode()
+        {
+            if (flatShadingRadioButton.Checked)
+            {
+                return ShadingMode.Flat;
+            }
+
+            if (gouraudShadingRadioButton.Checked)
+            {
+                return ShadingMode.Gouraud;
+            }
+
+            return ShadingMode.Phong;
+        }
+
+        private LightingOptions BuildLightingOptions()
+        {
+            return new LightingOptions(
+                lightColorButton.BackColor,
+                ambientIntensityTrackBar.Value / 100f,
+                diffuseIntensityTrackBar.Value / 100f,
+                specularIntensityTrackBar.Value / 100f,
+                shininessTrackBar.Value,
+                lightXTrackBar.Value / 100f,
+                lightYTrackBar.Value / 100f,
+                lightZTrackBar.Value / 100f);
+        }
+
         private void UpdateProjectionControlAvailability(bool hasMesh)
         {
             normalProjectionRadioButton.Enabled = hasMesh;
@@ -663,6 +755,17 @@ namespace _3d_graphics_editor
             perspectiveZOffsetLabel.Text = $"Z offset: {perspectiveZOffsetTrackBar.Value}";
         }
 
+        private void UpdateLightingControlTexts()
+        {
+            ambientIntensityLabel.Text = $"Intensidade: {ambientIntensityTrackBar.Value}%";
+            diffuseIntensityLabel.Text = $"Intensidade: {diffuseIntensityTrackBar.Value}%";
+            specularIntensityLabel.Text = $"Intensidade: {specularIntensityTrackBar.Value}%";
+            shininessLabel.Text = $"Brilho: {shininessTrackBar.Value}";
+            lightXLabel.Text = $"X: {lightXTrackBar.Value / 100f:F2}";
+            lightYLabel.Text = $"Y: {lightYTrackBar.Value / 100f:F2}";
+            lightZLabel.Text = $"Z: {lightZTrackBar.Value / 100f:F2}";
+        }
+
         private enum DragMode
         {
             None,
@@ -673,7 +776,8 @@ namespace _3d_graphics_editor
         private enum SidebarView
         {
             Transform,
-            Projection
+            Projection,
+            Lighting
         }
     }
 }

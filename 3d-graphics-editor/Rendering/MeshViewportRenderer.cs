@@ -44,6 +44,7 @@ namespace _3d_graphics_editor.Rendering
         private ProjectionView _projectionThumbnailCacheProjection;
         private ProjectionParameters _projectionThumbnailCacheParameters;
         private bool _projectionThumbnailCacheFillFaces;
+        private bool _projectionThumbnailCacheShowEdges;
         private bool _projectionThumbnailCacheShowBackFaces;
 
         public void Render(
@@ -76,10 +77,14 @@ namespace _3d_graphics_editor.Rendering
             }
 
             var transformedVertices = TransformVertices(mesh, transform);
+            var transformedNormals = TransformNormals(mesh, transform);
+            var generatedVertexNormals = BuildGeneratedVertexNormals(mesh, transformedVertices);
             var mainProjection = options.Mode == ViewportMode.Projection
                 ? options.Projection
                 : ProjectionView.Normal;
             var projectionVertices = ApplyProjectionViewTransform(transformedVertices, mainProjection, options.Parameters);
+            var projectionNormals = ApplyProjectionViewNormalTransform(transformedNormals, mainProjection, options.Parameters);
+            var projectionGeneratedVertexNormals = ApplyProjectionViewNormalTransform(generatedVertexNormals, mainProjection, options.Parameters);
 
             var renderableFaces = CreateRenderableFaces(
                 mesh,
@@ -87,16 +92,21 @@ namespace _3d_graphics_editor.Rendering
                 renderBounds,
                 mainProjection,
                 options.ShowBackFaces,
-                options.Parameters);
+                options.Parameters,
+                projectionNormals,
+                projectionGeneratedVertexNormals);
 
             DrawProjectedMesh(
                 graphics,
                 renderableFaces,
                 renderBounds,
                 options.FillFaces,
+                options.ShowEdges,
                 options.ShowBackFaces,
                 EdgeColor,
-                null);
+                null,
+                options.ShadingMode,
+                options.Lighting);
 
             if (mainProjection == ProjectionView.OnePointPerspective)
             {
@@ -201,6 +211,79 @@ namespace _3d_graphics_editor.Rendering
             return transformed;
         }
 
+        private static Vector3D[] TransformNormals(Mesh mesh, TransformState transform)
+        {
+            if (mesh.Normals.Count == 0)
+            {
+                return [];
+            }
+
+            var normalMatrix = Transform3D.Compose(
+                Transform3D.CreateRotationZ(transform.RotationZ),
+                Transform3D.CreateRotationY(transform.RotationY),
+                Transform3D.CreateRotationX(transform.RotationX));
+
+            var transformed = new Vector3D[mesh.Normals.Count];
+            for (var i = 0; i < mesh.Normals.Count; i++)
+            {
+                var normal = mesh.Normals[i];
+                var vector = normalMatrix.Transform(new Vector4(normal.X, normal.Y, normal.Z, 0f));
+                transformed[i] = Normalize(new Vector3D(vector.X, vector.Y, vector.Z));
+            }
+
+            return transformed;
+        }
+
+        private static Vector3D[] BuildGeneratedVertexNormals(Mesh mesh, Vector3D[] transformedVertices)
+        {
+            var normals = new Vector3D[transformedVertices.Length];
+
+            foreach (var face in mesh.Faces)
+            {
+                if (face.Vertices.Count < 3)
+                {
+                    continue;
+                }
+
+                var firstIndex = face.Vertices[0].VertexIndex;
+                var secondIndex = face.Vertices[1].VertexIndex;
+                var thirdIndex = face.Vertices[2].VertexIndex;
+                if (!IsValidIndex(firstIndex, transformedVertices.Length) ||
+                    !IsValidIndex(secondIndex, transformedVertices.Length) ||
+                    !IsValidIndex(thirdIndex, transformedVertices.Length))
+                {
+                    continue;
+                }
+
+                var faceNormal = Normalize(ComputeFaceNormal(
+                    transformedVertices[firstIndex],
+                    transformedVertices[secondIndex],
+                    transformedVertices[thirdIndex]));
+
+                if (LengthSquared(faceNormal) <= 0.0000001f)
+                {
+                    continue;
+                }
+
+                foreach (var faceVertex in face.Vertices)
+                {
+                    if (!IsValidIndex(faceVertex.VertexIndex, normals.Length))
+                    {
+                        continue;
+                    }
+
+                    normals[faceVertex.VertexIndex] = Add(normals[faceVertex.VertexIndex], faceNormal);
+                }
+            }
+
+            for (var i = 0; i < normals.Length; i++)
+            {
+                normals[i] = Normalize(normals[i]);
+            }
+
+            return normals;
+        }
+
         private static Vector3D[] ApplyProjectionViewTransform(
             Vector3D[] transformedVertices,
             ProjectionView projection,
@@ -229,16 +312,57 @@ namespace _3d_graphics_editor.Rendering
             return adjustedVertices;
         }
 
+        private static Vector3D[] ApplyProjectionViewNormalTransform(
+            Vector3D[] normals,
+            ProjectionView projection,
+            ProjectionParameters parameters)
+        {
+            if (normals.Length == 0)
+            {
+                return normals;
+            }
+
+            var adjustedNormals = new Vector3D[normals.Length];
+            for (var i = 0; i < normals.Length; i++)
+            {
+                var normal = normals[i];
+
+                if (projection == ProjectionView.Cavalier || projection == ProjectionView.Cabinet)
+                {
+                    normal = RotateY(normal, DegreesToRadians(parameters.ObliqueRotationYDegrees));
+                }
+                else if (projection == ProjectionView.OnePointPerspective)
+                {
+                    normal = RotateX(normal, DegreesToRadians(parameters.PerspectiveRotationXDegrees));
+                    normal = RotateY(normal, DegreesToRadians(parameters.PerspectiveRotationYDegrees));
+                }
+
+                adjustedNormals[i] = Normalize(normal);
+            }
+
+            return adjustedNormals;
+        }
+
         private static List<RenderableFace> CreateRenderableFaces(
             Mesh mesh,
             Vector3D[] transformedVertices,
             Rectangle bounds,
             ProjectionView projection,
             bool showBackFaces,
-            ProjectionParameters parameters)
+            ProjectionParameters parameters,
+            Vector3D[]? transformedNormals = null,
+            Vector3D[]? generatedVertexNormals = null)
         {
             var projectedVertices = ProjectVertices(transformedVertices, bounds, projection, parameters);
-            return BuildRenderableFaces(mesh, transformedVertices, projectedVertices, projection, showBackFaces, parameters);
+            return BuildRenderableFaces(
+                mesh,
+                transformedVertices,
+                projectedVertices,
+                projection,
+                showBackFaces,
+                parameters,
+                transformedNormals ?? [],
+                generatedVertexNormals ?? BuildGeneratedVertexNormals(mesh, transformedVertices));
         }
 
         private static PointF?[] ProjectVertices(
@@ -265,7 +389,9 @@ namespace _3d_graphics_editor.Rendering
             PointF?[] projectedVertices,
             ProjectionView projection,
             bool showBackFaces,
-            ProjectionParameters parameters)
+            ProjectionParameters parameters,
+            Vector3D[] transformedNormals,
+            Vector3D[] generatedVertexNormals)
         {
             var renderableFaces = new List<RenderableFace>(mesh.Faces.Count);
 
@@ -283,6 +409,8 @@ namespace _3d_graphics_editor.Rendering
                         projectedVertices,
                         projection,
                         parameters,
+                        transformedNormals,
+                        generatedVertexNormals,
                         out var renderableFace))
                 {
                     continue;
@@ -306,6 +434,8 @@ namespace _3d_graphics_editor.Rendering
             PointF?[] projectedVertices,
             ProjectionView projection,
             ProjectionParameters parameters,
+            Vector3D[] transformedNormals,
+            Vector3D[] generatedVertexNormals,
             out RenderableFace renderableFace)
         {
             var screenVertices = new ScreenVertex[face.Vertices.Count];
@@ -313,7 +443,8 @@ namespace _3d_graphics_editor.Rendering
 
             for (var i = 0; i < face.Vertices.Count; i++)
             {
-                var vertexIndex = face.Vertices[i].VertexIndex;
+                var faceVertex = face.Vertices[i];
+                var vertexIndex = faceVertex.VertexIndex;
                 if (!IsValidIndex(vertexIndex, transformedVertices.Length) ||
                     projectedVertices[vertexIndex] is null)
                 {
@@ -324,10 +455,14 @@ namespace _3d_graphics_editor.Rendering
                 faceVertices[i] = transformedVertices[vertexIndex];
 
                 var depth = GetDepthValue(transformedVertices[vertexIndex], projection, parameters);
-                screenVertices[i] = new ScreenVertex(projectedVertices[vertexIndex]!.Value, depth);
+                screenVertices[i] = new ScreenVertex(
+                    projectedVertices[vertexIndex]!.Value,
+                    depth,
+                    transformedVertices[vertexIndex],
+                    GetFaceVertexNormal(faceVertex, transformedNormals, generatedVertexNormals));
             }
 
-            var geometricNormal = ComputeFaceNormal(faceVertices[0], faceVertices[1], faceVertices[2]);
+            var geometricNormal = Normalize(ComputeFaceNormal(faceVertices[0], faceVertices[1], faceVertices[2]));
             if (LengthSquared(geometricNormal) <= 0.0000001f)
             {
                 renderableFace = default;
@@ -336,14 +471,46 @@ namespace _3d_graphics_editor.Rendering
 
             var isFrontFace = IsFrontFace(faceVertices[0], geometricNormal, projection, parameters);
             var fillColor = GetFaceColor(mesh, face);
+            var faceCenter = ComputeCenter(faceVertices);
             var useReciprocalDepthInterpolation = projection is ProjectionView.Normal or ProjectionView.OnePointPerspective;
 
             renderableFace = new RenderableFace(
                 screenVertices,
                 fillColor,
+                geometricNormal,
+                faceCenter,
                 isFrontFace,
                 useReciprocalDepthInterpolation);
             return true;
+        }
+
+        private static Vector3D GetFaceVertexNormal(
+            FaceVertex faceVertex,
+            Vector3D[] transformedNormals,
+            Vector3D[] generatedVertexNormals)
+        {
+            if (faceVertex.NormalIndex is { } normalIndex && IsValidIndex(normalIndex, transformedNormals.Length))
+            {
+                return Normalize(transformedNormals[normalIndex]);
+            }
+
+            if (IsValidIndex(faceVertex.VertexIndex, generatedVertexNormals.Length))
+            {
+                return Normalize(generatedVertexNormals[faceVertex.VertexIndex]);
+            }
+
+            return new Vector3D(0f, 0f, -1f);
+        }
+
+        private static Vector3D ComputeCenter(IReadOnlyList<Vector3D> vertices)
+        {
+            var center = new Vector3D();
+            foreach (var vertex in vertices)
+            {
+                center = Add(center, vertex);
+            }
+
+            return Divide(center, vertices.Count);
         }
 
         private static Color GetFaceColor(Mesh mesh, Face face)
@@ -549,9 +716,12 @@ namespace _3d_graphics_editor.Rendering
             IReadOnlyList<RenderableFace> renderableFaces,
             Rectangle bounds,
             bool fillFaces,
+            bool showEdges,
             bool showBackFaces,
             Color edgeColor,
-            Color? uniformFillColor)
+            Color? uniformFillColor,
+            ShadingMode shadingMode,
+            LightingOptions lighting)
         {
             if (renderableFaces.Count == 0 || bounds.Width <= 0 || bounds.Height <= 0)
             {
@@ -566,12 +736,18 @@ namespace _3d_graphics_editor.Rendering
                     bounds,
                     fillFaces,
                     !showBackFaces,
+                    showEdges,
                     edgeColor,
-                    uniformFillColor);
+                    uniformFillColor,
+                    shadingMode,
+                    lighting);
                 return;
             }
 
-            DrawWireframe(graphics, renderableFaces, bounds, edgeColor);
+            if (showEdges)
+            {
+                DrawWireframe(graphics, renderableFaces, bounds, edgeColor);
+            }
         }
 
         private void DrawZBufferedMesh(
@@ -580,8 +756,11 @@ namespace _3d_graphics_editor.Rendering
             Rectangle bounds,
             bool fillFaces,
             bool depthTestEdges,
+            bool showEdges,
             Color edgeColor,
-            Color? uniformFillColor)
+            Color? uniformFillColor,
+            ShadingMode shadingMode,
+            LightingOptions lighting)
         {
             var width = bounds.Width;
             var height = bounds.Height;
@@ -593,12 +772,15 @@ namespace _3d_graphics_editor.Rendering
 
             foreach (var face in renderableFaces)
             {
-                var faceColor = (uniformFillColor ?? face.FillColor).ToArgb();
-                ScanlineFill(face, bounds, width, height, fillFaces, faceColor);
+                var faceColor = uniformFillColor ?? face.FillColor;
+                ScanlineFill(face, bounds, width, height, fillFaces, faceColor, uniformFillColor.HasValue, shadingMode, lighting);
             }
 
             CopyColorBufferToBitmap(width, height);
-            DrawEdgeOverlay(renderableFaces, bounds, width, height, depthTestEdges, edgeColor);
+            if (showEdges)
+            {
+                DrawEdgeOverlay(renderableFaces, bounds, width, height, depthTestEdges, edgeColor);
+            }
 
             graphics.DrawImage(
                 _rasterBitmap!,
@@ -700,7 +882,10 @@ namespace _3d_graphics_editor.Rendering
             int width,
             int height,
             bool writeColor,
-            int colorArgb)
+            Color materialColor,
+            bool useUniformColor,
+            ShadingMode shadingMode,
+            LightingOptions lighting)
         {
             if (face.ScreenVertices.Length < 3)
             {
@@ -709,10 +894,25 @@ namespace _3d_graphics_editor.Rendering
 
             var points = new Point[face.ScreenVertices.Length];
             var depthSamples = new double[face.ScreenVertices.Length];
+            var vertexColors = new ColorVector[face.ScreenVertices.Length];
+            var effectiveShadingMode = useUniformColor ? ShadingMode.Flat : shadingMode;
+            var flatColorArgb = useUniformColor
+                ? materialColor.ToArgb()
+                : ColorVectorToArgb(CalculateIlluminatedColor(face.FaceNormal, face.Center, materialColor, lighting));
+
             for (var i = 0; i < face.ScreenVertices.Length; i++)
             {
                 points[i] = ToBitmapPoint(face.ScreenVertices[i].Point, bounds);
                 depthSamples[i] = ToDepthSample(face.ScreenVertices[i].Depth, face.UseReciprocalDepthInterpolation);
+
+                if (effectiveShadingMode == ShadingMode.Gouraud)
+                {
+                    vertexColors[i] = CalculateIlluminatedColor(
+                        face.ScreenVertices[i].Normal,
+                        face.ScreenVertices[i].Position,
+                        materialColor,
+                        lighting);
+                }
             }
 
             var yMinPolygon = points.Min(point => point.Y);
@@ -729,10 +929,17 @@ namespace _3d_graphics_editor.Rendering
 
             for (var i = 0; i < points.Length; i++)
             {
+                var nextIndex = (i + 1) % points.Length;
                 var p1 = points[i];
-                var p2 = points[(i + 1) % points.Length];
+                var p2 = points[nextIndex];
                 var depth1 = depthSamples[i];
-                var depth2 = depthSamples[(i + 1) % points.Length];
+                var depth2 = depthSamples[nextIndex];
+                var color1 = vertexColors[i];
+                var color2 = vertexColors[nextIndex];
+                var normal1 = face.ScreenVertices[i].Normal;
+                var normal2 = face.ScreenVertices[nextIndex].Normal;
+                var position1 = face.ScreenVertices[i].Position;
+                var position2 = face.ScreenVertices[nextIndex].Position;
 
                 if (p1.Y == p2.Y)
                 {
@@ -743,6 +950,9 @@ namespace _3d_graphics_editor.Rendering
                 {
                     (p1, p2) = (p2, p1);
                     (depth1, depth2) = (depth2, depth1);
+                    (color1, color2) = (color2, color1);
+                    (normal1, normal2) = (normal2, normal1);
+                    (position1, position2) = (position2, position1);
                 }
 
                 if (p2.Y <= 0 || p1.Y >= height)
@@ -755,6 +965,15 @@ namespace _3d_graphics_editor.Rendering
                 var incrementDepth = (depth2 - depth1) / deltaY;
                 var startY = Math.Max(p1.Y, 0);
                 var yOffset = startY - p1.Y;
+                var incrementRed = (color2.R - color1.R) / deltaY;
+                var incrementGreen = (color2.G - color1.G) / deltaY;
+                var incrementBlue = (color2.B - color1.B) / deltaY;
+                var incrementNormalX = (normal2.X - normal1.X) / deltaY;
+                var incrementNormalY = (normal2.Y - normal1.Y) / deltaY;
+                var incrementNormalZ = (normal2.Z - normal1.Z) / deltaY;
+                var incrementPositionX = (position2.X - position1.X) / deltaY;
+                var incrementPositionY = (position2.Y - position1.Y) / deltaY;
+                var incrementPositionZ = (position2.Z - position1.Z) / deltaY;
 
                 var entry = new EdgeEntry
                 {
@@ -762,7 +981,25 @@ namespace _3d_graphics_editor.Rendering
                     X = p1.X + (incrementX * yOffset),
                     IncrementX = incrementX,
                     Depth = depth1 + (incrementDepth * yOffset),
-                    IncrementDepth = incrementDepth
+                    IncrementDepth = incrementDepth,
+                    Red = color1.R + (incrementRed * yOffset),
+                    Green = color1.G + (incrementGreen * yOffset),
+                    Blue = color1.B + (incrementBlue * yOffset),
+                    IncrementRed = incrementRed,
+                    IncrementGreen = incrementGreen,
+                    IncrementBlue = incrementBlue,
+                    NormalX = normal1.X + (incrementNormalX * yOffset),
+                    NormalY = normal1.Y + (incrementNormalY * yOffset),
+                    NormalZ = normal1.Z + (incrementNormalZ * yOffset),
+                    IncrementNormalX = incrementNormalX,
+                    IncrementNormalY = incrementNormalY,
+                    IncrementNormalZ = incrementNormalZ,
+                    PositionX = position1.X + (incrementPositionX * yOffset),
+                    PositionY = position1.Y + (incrementPositionY * yOffset),
+                    PositionZ = position1.Z + (incrementPositionZ * yOffset),
+                    IncrementPositionX = incrementPositionX,
+                    IncrementPositionY = incrementPositionY,
+                    IncrementPositionZ = incrementPositionZ
                 };
 
                 if (!edgeTable.ContainsKey(startY))
@@ -814,12 +1051,53 @@ namespace _3d_graphics_editor.Rendering
                         ? 0d
                         : (rightEdge.Depth - leftEdge.Depth) / spanWidth;
                     var depthSample = leftEdge.Depth + (depthIncrement * (clippedXStart - xStart));
+                    var redIncrement = spanWidth == 0 ? 0d : (rightEdge.Red - leftEdge.Red) / spanWidth;
+                    var greenIncrement = spanWidth == 0 ? 0d : (rightEdge.Green - leftEdge.Green) / spanWidth;
+                    var blueIncrement = spanWidth == 0 ? 0d : (rightEdge.Blue - leftEdge.Blue) / spanWidth;
+                    var normalXIncrement = spanWidth == 0 ? 0d : (rightEdge.NormalX - leftEdge.NormalX) / spanWidth;
+                    var normalYIncrement = spanWidth == 0 ? 0d : (rightEdge.NormalY - leftEdge.NormalY) / spanWidth;
+                    var normalZIncrement = spanWidth == 0 ? 0d : (rightEdge.NormalZ - leftEdge.NormalZ) / spanWidth;
+                    var positionXIncrement = spanWidth == 0 ? 0d : (rightEdge.PositionX - leftEdge.PositionX) / spanWidth;
+                    var positionYIncrement = spanWidth == 0 ? 0d : (rightEdge.PositionY - leftEdge.PositionY) / spanWidth;
+                    var positionZIncrement = spanWidth == 0 ? 0d : (rightEdge.PositionZ - leftEdge.PositionZ) / spanWidth;
+                    var red = leftEdge.Red + (redIncrement * (clippedXStart - xStart));
+                    var green = leftEdge.Green + (greenIncrement * (clippedXStart - xStart));
+                    var blue = leftEdge.Blue + (blueIncrement * (clippedXStart - xStart));
+                    var normalX = leftEdge.NormalX + (normalXIncrement * (clippedXStart - xStart));
+                    var normalY = leftEdge.NormalY + (normalYIncrement * (clippedXStart - xStart));
+                    var normalZ = leftEdge.NormalZ + (normalZIncrement * (clippedXStart - xStart));
+                    var positionX = leftEdge.PositionX + (positionXIncrement * (clippedXStart - xStart));
+                    var positionY = leftEdge.PositionY + (positionYIncrement * (clippedXStart - xStart));
+                    var positionZ = leftEdge.PositionZ + (positionZIncrement * (clippedXStart - xStart));
 
                     for (var x = clippedXStart; x < clippedXEnd; x++)
                     {
                         var depth = FromDepthSample(depthSample, face.UseReciprocalDepthInterpolation);
-                        TryWritePixel(x, y, width, height, depth, writeColor, colorArgb, DepthEpsilon);
+                        var pixelColorArgb = flatColorArgb;
+                        if (writeColor && effectiveShadingMode == ShadingMode.Gouraud)
+                        {
+                            pixelColorArgb = ColorVectorToArgb(new ColorVector((float)red, (float)green, (float)blue));
+                        }
+                        else if (writeColor && effectiveShadingMode == ShadingMode.Phong)
+                        {
+                            pixelColorArgb = ColorVectorToArgb(CalculateIlluminatedColor(
+                                new Vector3D((float)normalX, (float)normalY, (float)normalZ),
+                                new Vector3D((float)positionX, (float)positionY, (float)positionZ),
+                                materialColor,
+                                lighting));
+                        }
+
+                        TryWritePixel(x, y, width, height, depth, writeColor, pixelColorArgb, DepthEpsilon);
                         depthSample += depthIncrement;
+                        red += redIncrement;
+                        green += greenIncrement;
+                        blue += blueIncrement;
+                        normalX += normalXIncrement;
+                        normalY += normalYIncrement;
+                        normalZ += normalZIncrement;
+                        positionX += positionXIncrement;
+                        positionY += positionYIncrement;
+                        positionZ += positionZIncrement;
                     }
                 }
 
@@ -827,8 +1105,73 @@ namespace _3d_graphics_editor.Rendering
                 {
                     edge.X += edge.IncrementX;
                     edge.Depth += edge.IncrementDepth;
+                    edge.Red += edge.IncrementRed;
+                    edge.Green += edge.IncrementGreen;
+                    edge.Blue += edge.IncrementBlue;
+                    edge.NormalX += edge.IncrementNormalX;
+                    edge.NormalY += edge.IncrementNormalY;
+                    edge.NormalZ += edge.IncrementNormalZ;
+                    edge.PositionX += edge.IncrementPositionX;
+                    edge.PositionY += edge.IncrementPositionY;
+                    edge.PositionZ += edge.IncrementPositionZ;
                 }
             }
+        }
+
+        private static ColorVector CalculateIlluminatedColor(
+            Vector3D normal,
+            Vector3D position,
+            Color materialColor,
+            LightingOptions lighting)
+        {
+            var material = ColorToVector(materialColor);
+            var lightColor = ColorToVector(lighting.LightColor);
+
+            var n = Normalize(normal);
+            var lightPosition = new Vector3D(lighting.LightX, lighting.LightY, lighting.LightZ);
+            var lightVector = Normalize(Subtract(lightPosition, position));
+            var viewVector = Normalize(Subtract(new Vector3D(0f, 0f, -CameraDistance), position));
+            var halfVector = Normalize(Add(lightVector, viewVector));
+
+            var diffuseFactor = MathF.Max(0f, Dot(n, lightVector));
+            var specularFactor = diffuseFactor <= 0f
+                ? 0f
+                : MathF.Pow(MathF.Max(0f, Dot(n, halfVector)), MathF.Max(1f, lighting.Shininess));
+
+            return new ColorVector(
+                Clamp01((material.R * lightColor.R * lighting.AmbientIntensity) +
+                        (material.R * lightColor.R * lighting.DiffuseIntensity * diffuseFactor) +
+                        (lightColor.R * lighting.SpecularIntensity * specularFactor)),
+                Clamp01((material.G * lightColor.G * lighting.AmbientIntensity) +
+                        (material.G * lightColor.G * lighting.DiffuseIntensity * diffuseFactor) +
+                        (lightColor.G * lighting.SpecularIntensity * specularFactor)),
+                Clamp01((material.B * lightColor.B * lighting.AmbientIntensity) +
+                        (material.B * lightColor.B * lighting.DiffuseIntensity * diffuseFactor) +
+                        (lightColor.B * lighting.SpecularIntensity * specularFactor)));
+        }
+
+        private static ColorVector ColorToVector(Color color)
+        {
+            return new ColorVector(color.R / 255f, color.G / 255f, color.B / 255f);
+        }
+
+        private static int ColorVectorToArgb(ColorVector color)
+        {
+            var red = ToByte(color.R);
+            var green = ToByte(color.G);
+            var blue = ToByte(color.B);
+
+            return (255 << 24) | (red << 16) | (green << 8) | blue;
+        }
+
+        private static int ToByte(float value)
+        {
+            return Math.Clamp((int)MathF.Round(Clamp01(value) * 255f), 0, 255);
+        }
+
+        private static float Clamp01(float value)
+        {
+            return Math.Clamp(value, 0f, 1f);
         }
 
         private unsafe void DrawEdgeOverlay(
@@ -1313,6 +1656,7 @@ namespace _3d_graphics_editor.Rendering
                    _projectionThumbnailCacheProjection == options.Projection &&
                    _projectionThumbnailCacheParameters.Equals(options.Parameters) &&
                    _projectionThumbnailCacheFillFaces == options.FillFaces &&
+                   _projectionThumbnailCacheShowEdges == options.ShowEdges &&
                    _projectionThumbnailCacheShowBackFaces == options.ShowBackFaces;
         }
 
@@ -1354,6 +1698,7 @@ namespace _3d_graphics_editor.Rendering
             _projectionThumbnailCacheProjection = options.Projection;
             _projectionThumbnailCacheParameters = options.Parameters;
             _projectionThumbnailCacheFillFaces = options.FillFaces;
+            _projectionThumbnailCacheShowEdges = options.ShowEdges;
             _projectionThumbnailCacheShowBackFaces = options.ShowBackFaces;
         }
 
@@ -1403,9 +1748,12 @@ namespace _3d_graphics_editor.Rendering
                 renderableFaces,
                 previewCanvas,
                 options.FillFaces,
+                options.ShowEdges,
                 options.ShowBackFaces,
                 preview.AccentColor,
-                overlayFillColor);
+                overlayFillColor,
+                ShadingMode.Flat,
+                LightingOptions.Default);
 
             if (preview.View == ProjectionView.OnePointPerspective)
             {
@@ -1539,6 +1887,36 @@ namespace _3d_graphics_editor.Rendering
             return new Vector3D(left.X - right.X, left.Y - right.Y, left.Z - right.Z);
         }
 
+        private static Vector3D Add(Vector3D left, Vector3D right)
+        {
+            return new Vector3D(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
+        }
+
+        private static Vector3D Divide(Vector3D vector, float divisor)
+        {
+            if (MathF.Abs(divisor) <= 0.000001f)
+            {
+                return vector;
+            }
+
+            return new Vector3D(vector.X / divisor, vector.Y / divisor, vector.Z / divisor);
+        }
+
+        private static Vector3D Normalize(Vector3D vector)
+        {
+            var lengthSquared = LengthSquared(vector);
+            if (lengthSquared <= 0.0000001f)
+            {
+                return new Vector3D(0f, 0f, -1f);
+            }
+
+            var inverseLength = 1f / MathF.Sqrt(lengthSquared);
+            return new Vector3D(
+                vector.X * inverseLength,
+                vector.Y * inverseLength,
+                vector.Z * inverseLength);
+        }
+
         private static Vector3D Cross(Vector3D left, Vector3D right)
         {
             return new Vector3D(
@@ -1565,10 +1943,18 @@ namespace _3d_graphics_editor.Rendering
         private readonly record struct RenderableFace(
             ScreenVertex[] ScreenVertices,
             Color FillColor,
+            Vector3D FaceNormal,
+            Vector3D Center,
             bool IsFrontFace,
             bool UseReciprocalDepthInterpolation);
 
-        private readonly record struct ScreenVertex(PointF Point, float Depth);
+        private readonly record struct ScreenVertex(
+            PointF Point,
+            float Depth,
+            Vector3D Position,
+            Vector3D Normal);
+
+        private readonly record struct ColorVector(float R, float G, float B);
 
         private readonly record struct ProjectionThumbnailDefinition(
             ProjectionView View,
@@ -1589,6 +1975,24 @@ namespace _3d_graphics_editor.Rendering
             public double IncrementX { get; set; }
             public double Depth { get; set; }
             public double IncrementDepth { get; set; }
+            public double Red { get; set; }
+            public double Green { get; set; }
+            public double Blue { get; set; }
+            public double IncrementRed { get; set; }
+            public double IncrementGreen { get; set; }
+            public double IncrementBlue { get; set; }
+            public double NormalX { get; set; }
+            public double NormalY { get; set; }
+            public double NormalZ { get; set; }
+            public double IncrementNormalX { get; set; }
+            public double IncrementNormalY { get; set; }
+            public double IncrementNormalZ { get; set; }
+            public double PositionX { get; set; }
+            public double PositionY { get; set; }
+            public double PositionZ { get; set; }
+            public double IncrementPositionX { get; set; }
+            public double IncrementPositionY { get; set; }
+            public double IncrementPositionZ { get; set; }
         }
 
         private readonly record struct Edge2D(PointF First, PointF Second)
