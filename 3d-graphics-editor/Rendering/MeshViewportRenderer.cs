@@ -153,7 +153,7 @@ namespace _3d_graphics_editor.Rendering
         private static void DrawEmptyState(Graphics graphics, Rectangle bounds)
         {
             const string title = "Nenhum modelo carregado";
-            const string subtitle = "Use o botao Abrir .obj para visualizar um objeto 3D aqui.";
+            const string subtitle = "Use o botão Abrir .obj para visualizar um objeto 3D aqui.";
 
             using var titleFont = new Font("Segoe UI", 16f, FontStyle.Bold);
             using var subtitleFont = new Font("Segoe UI", 10f, FontStyle.Regular);
@@ -190,8 +190,8 @@ namespace _3d_graphics_editor.Rendering
             var maxDimension = MathF.Max(size.X, MathF.Max(size.Y, size.Z));
             var normalizationScale = maxDimension <= 0.0001f ? 1f : 2f / maxDimension;
 
-            // Mantemos toda a cadeia de transformacao 4x4 em um unico produto
-            // para que translacao, escala e rotacoes sejam aplicadas juntas.
+            // Mantemos toda a cadeia de transformação 4x4 em um único produto
+            // para que translação, escala e rotações sejam aplicadas juntas.
             var combinedMatrix = Transform3D.Compose(
                 Transform3D.CreateTranslation(transform.TranslationX, transform.TranslationY, transform.TranslationZ),
                 Transform3D.CreateRotationZ(transform.RotationZ),
@@ -617,10 +617,10 @@ namespace _3d_graphics_editor.Rendering
             float focalDistance,
             out PointF projectedPoint)
         {
-            // Formula do material:
+            // Fórmula do material:
             // x' = x * d / z
             // y' = y * d / z
-            // com COP na origem e plano de projecao em z = d.
+            // com COP na origem e plano de projeção em z = d.
             var depth = point.Z;
             if (depth <= 0.01f)
             {
@@ -648,7 +648,7 @@ namespace _3d_graphics_editor.Rendering
             float alphaDegrees,
             out PointF projectedPoint)
         {
-            // Formula da projecao obliqua do material:
+            // Fórmula da projeção oblíqua do material:
             // xp = x + z * L * cos(a) | yp = y + z * L * sin(a)
             var alpha = DegreesToRadians(alphaDegrees);
             var horizontal = point.X + (point.Z * depthFactor * MathF.Cos(alpha));
@@ -1138,21 +1138,44 @@ namespace _3d_graphics_editor.Rendering
                 ? 0f
                 : MathF.Pow(MathF.Max(0f, Dot(n, halfVector)), MathF.Max(1f, lighting.Shininess));
 
-            return new ColorVector(
-                Clamp01((material.R * lightColor.R * lighting.AmbientIntensity) +
-                        (material.R * lightColor.R * lighting.DiffuseIntensity * diffuseFactor) +
-                        (lightColor.R * lighting.SpecularIntensity * specularFactor)),
-                Clamp01((material.G * lightColor.G * lighting.AmbientIntensity) +
-                        (material.G * lightColor.G * lighting.DiffuseIntensity * diffuseFactor) +
-                        (lightColor.G * lighting.SpecularIntensity * specularFactor)),
-                Clamp01((material.B * lightColor.B * lighting.AmbientIntensity) +
-                        (material.B * lightColor.B * lighting.DiffuseIntensity * diffuseFactor) +
-                        (lightColor.B * lighting.SpecularIntensity * specularFactor)));
+            var ambient = new ColorVector(
+                material.R * lightColor.R * lighting.AmbientIntensity,
+                material.G * lightColor.G * lighting.AmbientIntensity,
+                material.B * lightColor.B * lighting.AmbientIntensity);
+
+            var diffuse = new ColorVector(
+                material.R * lightColor.R * lighting.DiffuseIntensity * diffuseFactor,
+                material.G * lightColor.G * lighting.DiffuseIntensity * diffuseFactor,
+                material.B * lightColor.B * lighting.DiffuseIntensity * diffuseFactor);
+
+            var specular = new ColorVector(
+                lightColor.R * lighting.SpecularIntensity * specularFactor,
+                lightColor.G * lighting.SpecularIntensity * specularFactor,
+                lightColor.B * lighting.SpecularIntensity * specularFactor);
+
+            return lighting.Component switch
+            {
+                LightingComponent.Ambient => ClampColor(ambient),
+                LightingComponent.Diffuse => ClampColor(diffuse),
+                LightingComponent.Specular => ClampColor(specular),
+                _ => ClampColor(new ColorVector(
+                    ambient.R + diffuse.R + specular.R,
+                    ambient.G + diffuse.G + specular.G,
+                    ambient.B + diffuse.B + specular.B))
+            };
         }
 
         private static ColorVector ColorToVector(Color color)
         {
             return new ColorVector(color.R / 255f, color.G / 255f, color.B / 255f);
+        }
+
+        private static ColorVector ClampColor(ColorVector color)
+        {
+            return new ColorVector(
+                Clamp01(color.R),
+                Clamp01(color.G),
+                Clamp01(color.B));
         }
 
         private static int ColorVectorToArgb(ColorVector color)
@@ -1787,20 +1810,20 @@ namespace _3d_graphics_editor.Rendering
                 ProjectionView.Lateral =>
                     "Lateral | plano YZ | profundidade X",
                 ProjectionView.Cavalier =>
-                    $"Cavaleira | L=1.0 | a={parameters.ObliqueAlphaDegrees:F0} deg",
+                    $"Cavaleira | L=1.0 | alfa={parameters.ObliqueAlphaDegrees:F0} graus",
                 ProjectionView.Cabinet =>
-                    $"Gabinete | L=0.5 | a={parameters.ObliqueAlphaDegrees:F0} deg",
+                    $"Gabinete | L=0.5 | alfa={parameters.ObliqueAlphaDegrees:F0} graus",
                 ProjectionView.OnePointPerspective =>
                     $"Perspectiva 1 PF | d={FixedOnePointFocalDistance:F0} | z={parameters.PerspectiveZOffset:F0}",
-                _ => "Projecao: Normal (XYZ)"
+                _ => "Projeção: Normal (XYZ)"
             };
         }
 
         private static float MapPerspectiveZOffsetToDepth(float zOffset)
         {
             // O slider vai de 100 a 400. Mantemos uma profundidade-base fixa
-            // para que a 1 PF nunca encoste demais no plano de projecao, mas
-            // ainda preserve o efeito visual do z offset.
+            // para que a 1 PF nunca encoste demais no plano de projeção, mas
+            // ainda preserve o efeito visual do deslocamento Z.
             return PerspectiveBaseDepthOffset + (zOffset / 100f);
         }
 

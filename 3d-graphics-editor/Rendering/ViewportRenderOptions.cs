@@ -26,6 +26,14 @@ namespace _3d_graphics_editor.Rendering
         OnePointPerspective
     }
 
+    public enum LightingComponent
+    {
+        Total,
+        Ambient,
+        Diffuse,
+        Specular
+    }
+
     public readonly record struct ProjectionParameters(
         float ObliqueAlphaDegrees,
         float ObliqueRotationYDegrees,
@@ -44,7 +52,8 @@ namespace _3d_graphics_editor.Rendering
         float Shininess,
         float LightX,
         float LightY,
-        float LightZ)
+        float LightZ,
+        LightingComponent Component)
     {
         public static LightingOptions Default =>
             new(
@@ -55,7 +64,8 @@ namespace _3d_graphics_editor.Rendering
                 32f,
                 -1.6f,
                 1.8f,
-                -2.8f);
+                -2.8f,
+                LightingComponent.Total);
     }
 
     public readonly record struct ViewportRenderOptions(

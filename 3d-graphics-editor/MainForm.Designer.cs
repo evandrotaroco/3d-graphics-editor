@@ -88,6 +88,11 @@ namespace _3d_graphics_editor
         private TrackBar lightYTrackBar;
         private Label lightZLabel;
         private TrackBar lightZTrackBar;
+        private GroupBox lightingComponentGroupBox;
+        private RadioButton totalLightingRadioButton;
+        private RadioButton ambientComponentRadioButton;
+        private RadioButton diffuseComponentRadioButton;
+        private RadioButton specularComponentRadioButton;
 
         /// <summary>
         ///  Clean up any resources being used.
@@ -145,6 +150,11 @@ namespace _3d_graphics_editor
             lightYLabel = new Label();
             lightXTrackBar = new TrackBar();
             lightXLabel = new Label();
+            lightingComponentGroupBox = new GroupBox();
+            specularComponentRadioButton = new RadioButton();
+            diffuseComponentRadioButton = new RadioButton();
+            ambientComponentRadioButton = new RadioButton();
+            totalLightingRadioButton = new RadioButton();
             specularLightingGroupBox = new GroupBox();
             shininessTrackBar = new TrackBar();
             shininessLabel = new Label();
@@ -209,6 +219,7 @@ namespace _3d_graphics_editor
             ((System.ComponentModel.ISupportInitialize)lightZTrackBar).BeginInit();
             ((System.ComponentModel.ISupportInitialize)lightYTrackBar).BeginInit();
             ((System.ComponentModel.ISupportInitialize)lightXTrackBar).BeginInit();
+            lightingComponentGroupBox.SuspendLayout();
             specularLightingGroupBox.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)shininessTrackBar).BeginInit();
             ((System.ComponentModel.ISupportInitialize)specularIntensityTrackBar).BeginInit();
@@ -232,10 +243,10 @@ namespace _3d_graphics_editor
             viewportGroupBox.Location = new Point(0, 0);
             viewportGroupBox.Name = "viewportGroupBox";
             viewportGroupBox.Padding = new Padding(14);
-            viewportGroupBox.Size = new Size(1038, 753);
+            viewportGroupBox.Size = new Size(950, 753);
             viewportGroupBox.TabIndex = 0;
             viewportGroupBox.TabStop = false;
-            viewportGroupBox.Text = "Visualizacao 3D";
+            viewportGroupBox.Text = "Visualização 3D";
             //
             // viewportPanel
             //
@@ -243,7 +254,7 @@ namespace _3d_graphics_editor
             viewportPanel.Dock = DockStyle.Fill;
             viewportPanel.Location = new Point(14, 32);
             viewportPanel.Name = "viewportPanel";
-            viewportPanel.Size = new Size(1010, 707);
+            viewportPanel.Size = new Size(922, 707);
             viewportPanel.TabIndex = 0;
             viewportPanel.TabStop = true;
             //
@@ -260,32 +271,35 @@ namespace _3d_graphics_editor
             sidebarPanel.Controls.Add(openButton);
             sidebarPanel.Controls.Add(sidebarTitleLabel);
             sidebarPanel.Dock = DockStyle.Right;
-            sidebarPanel.Location = new Point(1038, 0);
+            sidebarPanel.Location = new Point(950, 0);
             sidebarPanel.Name = "sidebarPanel";
             sidebarPanel.Padding = new Padding(18);
-            sidebarPanel.Size = new Size(312, 753);
+            sidebarPanel.Size = new Size(400, 753);
             sidebarPanel.TabIndex = 1;
             //
             // modeContentPanel
             //
+            modeContentPanel.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             modeContentPanel.Controls.Add(lightingPagePanel);
             modeContentPanel.Controls.Add(projectionPagePanel);
             modeContentPanel.Controls.Add(transformPagePanel);
             modeContentPanel.Location = new Point(18, 226);
             modeContentPanel.Name = "modeContentPanel";
-            modeContentPanel.Size = new Size(276, 494);
+            modeContentPanel.Size = new Size(364, 494);
             modeContentPanel.TabIndex = 7;
             //
             // projectionPagePanel
             //
+            projectionPagePanel.AutoScroll = true;
             projectionPagePanel.Controls.Add(perspectiveProjectionGroupBox);
             projectionPagePanel.Controls.Add(projectionModeGroupBox);
             projectionPagePanel.Controls.Add(orthographicProjectionGroupBox);
             projectionPagePanel.Controls.Add(showProjectionThumbnailsCheckBox);
             projectionPagePanel.Controls.Add(normalProjectionRadioButton);
+            projectionPagePanel.Dock = DockStyle.Fill;
             projectionPagePanel.Location = new Point(0, 0);
             projectionPagePanel.Name = "projectionPagePanel";
-            projectionPagePanel.Size = new Size(276, 494);
+            projectionPagePanel.Size = new Size(364, 494);
             projectionPagePanel.TabIndex = 1;
             projectionPagePanel.Visible = false;
             //
@@ -300,10 +314,10 @@ namespace _3d_graphics_editor
             perspectiveProjectionGroupBox.Controls.Add(onePointPerspectiveRadioButton);
             perspectiveProjectionGroupBox.Location = new Point(0, 292);
             perspectiveProjectionGroupBox.Name = "perspectiveProjectionGroupBox";
-            perspectiveProjectionGroupBox.Size = new Size(276, 178);
+            perspectiveProjectionGroupBox.Size = new Size(346, 178);
             perspectiveProjectionGroupBox.TabIndex = 3;
             perspectiveProjectionGroupBox.TabStop = false;
-            perspectiveProjectionGroupBox.Text = "Projecao de perspectiva 1 ponto de fuga";
+            perspectiveProjectionGroupBox.Text = "Projeção de perspectiva 1 ponto de fuga";
             //
             // perspectiveZOffsetTrackBar
             //
@@ -312,7 +326,7 @@ namespace _3d_graphics_editor
             perspectiveZOffsetTrackBar.Maximum = 400;
             perspectiveZOffsetTrackBar.Minimum = 100;
             perspectiveZOffsetTrackBar.Name = "perspectiveZOffsetTrackBar";
-            perspectiveZOffsetTrackBar.Size = new Size(240, 28);
+            perspectiveZOffsetTrackBar.Size = new Size(310, 28);
             perspectiveZOffsetTrackBar.TabIndex = 6;
             perspectiveZOffsetTrackBar.TickStyle = TickStyle.None;
             perspectiveZOffsetTrackBar.Value = 200;
@@ -322,9 +336,9 @@ namespace _3d_graphics_editor
             perspectiveZOffsetLabel.ForeColor = Color.FromArgb(61, 73, 89);
             perspectiveZOffsetLabel.Location = new Point(18, 120);
             perspectiveZOffsetLabel.Name = "perspectiveZOffsetLabel";
-            perspectiveZOffsetLabel.Size = new Size(240, 17);
+            perspectiveZOffsetLabel.Size = new Size(310, 17);
             perspectiveZOffsetLabel.TabIndex = 5;
-            perspectiveZOffsetLabel.Text = "Z offset: 200";
+            perspectiveZOffsetLabel.Text = "Deslocamento Z: 200";
             //
             // perspectiveRotationYTrackBar
             //
@@ -333,7 +347,7 @@ namespace _3d_graphics_editor
             perspectiveRotationYTrackBar.Maximum = 180;
             perspectiveRotationYTrackBar.Minimum = -180;
             perspectiveRotationYTrackBar.Name = "perspectiveRotationYTrackBar";
-            perspectiveRotationYTrackBar.Size = new Size(240, 28);
+            perspectiveRotationYTrackBar.Size = new Size(310, 28);
             perspectiveRotationYTrackBar.TabIndex = 4;
             perspectiveRotationYTrackBar.TickStyle = TickStyle.None;
             //
@@ -342,9 +356,9 @@ namespace _3d_graphics_editor
             perspectiveRotationYLabel.ForeColor = Color.FromArgb(61, 73, 89);
             perspectiveRotationYLabel.Location = new Point(18, 72);
             perspectiveRotationYLabel.Name = "perspectiveRotationYLabel";
-            perspectiveRotationYLabel.Size = new Size(240, 17);
+            perspectiveRotationYLabel.Size = new Size(310, 17);
             perspectiveRotationYLabel.TabIndex = 3;
-            perspectiveRotationYLabel.Text = "Rotacao em Y: 0 deg";
+            perspectiveRotationYLabel.Text = "Rotação em Y: 0 graus";
             //
             // perspectiveRotationXTrackBar
             //
@@ -353,7 +367,7 @@ namespace _3d_graphics_editor
             perspectiveRotationXTrackBar.Maximum = 180;
             perspectiveRotationXTrackBar.Minimum = -180;
             perspectiveRotationXTrackBar.Name = "perspectiveRotationXTrackBar";
-            perspectiveRotationXTrackBar.Size = new Size(240, 28);
+            perspectiveRotationXTrackBar.Size = new Size(310, 28);
             perspectiveRotationXTrackBar.TabIndex = 2;
             perspectiveRotationXTrackBar.TickStyle = TickStyle.None;
             //
@@ -362,9 +376,9 @@ namespace _3d_graphics_editor
             perspectiveRotationXLabel.ForeColor = Color.FromArgb(61, 73, 89);
             perspectiveRotationXLabel.Location = new Point(142, 28);
             perspectiveRotationXLabel.Name = "perspectiveRotationXLabel";
-            perspectiveRotationXLabel.Size = new Size(240, 17);
+            perspectiveRotationXLabel.Size = new Size(186, 17);
             perspectiveRotationXLabel.TabIndex = 1;
-            perspectiveRotationXLabel.Text = "Rotacao em X: 0 deg";
+            perspectiveRotationXLabel.Text = "Rotação em X: 0 graus";
             //
             // onePointPerspectiveRadioButton
             //
@@ -386,10 +400,10 @@ namespace _3d_graphics_editor
             projectionModeGroupBox.Controls.Add(cavalierProjectionRadioButton);
             projectionModeGroupBox.Location = new Point(0, 126);
             projectionModeGroupBox.Name = "projectionModeGroupBox";
-            projectionModeGroupBox.Size = new Size(276, 154);
+            projectionModeGroupBox.Size = new Size(346, 154);
             projectionModeGroupBox.TabIndex = 2;
             projectionModeGroupBox.TabStop = false;
-            projectionModeGroupBox.Text = "Projecoes obliquas";
+            projectionModeGroupBox.Text = "Projeções oblíquas";
             //
             // obliqueRotationYTrackBar
             //
@@ -398,7 +412,7 @@ namespace _3d_graphics_editor
             obliqueRotationYTrackBar.Maximum = 180;
             obliqueRotationYTrackBar.Minimum = -180;
             obliqueRotationYTrackBar.Name = "obliqueRotationYTrackBar";
-            obliqueRotationYTrackBar.Size = new Size(240, 28);
+            obliqueRotationYTrackBar.Size = new Size(310, 28);
             obliqueRotationYTrackBar.TabIndex = 5;
             obliqueRotationYTrackBar.TickStyle = TickStyle.None;
             //
@@ -407,9 +421,9 @@ namespace _3d_graphics_editor
             obliqueRotationYLabel.ForeColor = Color.FromArgb(61, 73, 89);
             obliqueRotationYLabel.Location = new Point(18, 100);
             obliqueRotationYLabel.Name = "obliqueRotationYLabel";
-            obliqueRotationYLabel.Size = new Size(240, 17);
+            obliqueRotationYLabel.Size = new Size(310, 17);
             obliqueRotationYLabel.TabIndex = 4;
-            obliqueRotationYLabel.Text = "Rotacao em Y: 0 deg";
+            obliqueRotationYLabel.Text = "Rotação em Y: 0 graus";
             //
             // obliqueAlphaTrackBar
             //
@@ -417,7 +431,7 @@ namespace _3d_graphics_editor
             obliqueAlphaTrackBar.Location = new Point(18, 72);
             obliqueAlphaTrackBar.Maximum = 90;
             obliqueAlphaTrackBar.Name = "obliqueAlphaTrackBar";
-            obliqueAlphaTrackBar.Size = new Size(240, 28);
+            obliqueAlphaTrackBar.Size = new Size(310, 28);
             obliqueAlphaTrackBar.TabIndex = 3;
             obliqueAlphaTrackBar.TickStyle = TickStyle.None;
             obliqueAlphaTrackBar.Value = 45;
@@ -427,9 +441,9 @@ namespace _3d_graphics_editor
             obliqueAlphaLabel.ForeColor = Color.FromArgb(61, 73, 89);
             obliqueAlphaLabel.Location = new Point(18, 52);
             obliqueAlphaLabel.Name = "obliqueAlphaLabel";
-            obliqueAlphaLabel.Size = new Size(240, 17);
+            obliqueAlphaLabel.Size = new Size(310, 17);
             obliqueAlphaLabel.TabIndex = 2;
-            obliqueAlphaLabel.Text = "Angulo alfa: 45 deg";
+            obliqueAlphaLabel.Text = "Ângulo alfa: 45 graus";
             //
             // cabinetProjectionRadioButton
             //
@@ -458,10 +472,10 @@ namespace _3d_graphics_editor
             orthographicProjectionGroupBox.Controls.Add(frontalProjectionRadioButton);
             orthographicProjectionGroupBox.Location = new Point(0, 34);
             orthographicProjectionGroupBox.Name = "orthographicProjectionGroupBox";
-            orthographicProjectionGroupBox.Size = new Size(276, 82);
+            orthographicProjectionGroupBox.Size = new Size(346, 82);
             orthographicProjectionGroupBox.TabIndex = 1;
             orthographicProjectionGroupBox.TabStop = false;
-            orthographicProjectionGroupBox.Text = "Projecoes ortograficas";
+            orthographicProjectionGroupBox.Text = "Projeções ortográficas";
             //
             // lateralProjectionRadioButton
             //
@@ -496,7 +510,7 @@ namespace _3d_graphics_editor
             // showProjectionThumbnailsCheckBox
             //
             showProjectionThumbnailsCheckBox.AutoSize = true;
-            showProjectionThumbnailsCheckBox.Location = new Point(130, 8);
+            showProjectionThumbnailsCheckBox.Location = new Point(190, 8);
             showProjectionThumbnailsCheckBox.Name = "showProjectionThumbnailsCheckBox";
             showProjectionThumbnailsCheckBox.Size = new Size(126, 19);
             showProjectionThumbnailsCheckBox.TabIndex = 4;
@@ -517,14 +531,17 @@ namespace _3d_graphics_editor
             //
             // lightingPagePanel
             //
+            lightingPagePanel.AutoScroll = true;
+            lightingPagePanel.Controls.Add(lightingComponentGroupBox);
             lightingPagePanel.Controls.Add(lightPositionGroupBox);
             lightingPagePanel.Controls.Add(specularLightingGroupBox);
             lightingPagePanel.Controls.Add(diffuseLightingGroupBox);
             lightingPagePanel.Controls.Add(ambientLightingGroupBox);
             lightingPagePanel.Controls.Add(shadingGroupBox);
+            lightingPagePanel.Dock = DockStyle.Fill;
             lightingPagePanel.Location = new Point(0, 0);
             lightingPagePanel.Name = "lightingPagePanel";
-            lightingPagePanel.Size = new Size(276, 494);
+            lightingPagePanel.Size = new Size(364, 494);
             lightingPagePanel.TabIndex = 2;
             lightingPagePanel.Visible = false;
             //
@@ -538,10 +555,10 @@ namespace _3d_graphics_editor
             lightPositionGroupBox.Controls.Add(lightXLabel);
             lightPositionGroupBox.Location = new Point(0, 378);
             lightPositionGroupBox.Name = "lightPositionGroupBox";
-            lightPositionGroupBox.Size = new Size(276, 116);
+            lightPositionGroupBox.Size = new Size(346, 116);
             lightPositionGroupBox.TabIndex = 4;
             lightPositionGroupBox.TabStop = false;
-            lightPositionGroupBox.Text = "Posicao da luz";
+            lightPositionGroupBox.Text = "Posição da luz";
             //
             // lightZTrackBar
             //
@@ -550,7 +567,7 @@ namespace _3d_graphics_editor
             lightZTrackBar.Maximum = 500;
             lightZTrackBar.Minimum = -500;
             lightZTrackBar.Name = "lightZTrackBar";
-            lightZTrackBar.Size = new Size(160, 24);
+            lightZTrackBar.Size = new Size(230, 24);
             lightZTrackBar.TabIndex = 5;
             lightZTrackBar.TickStyle = TickStyle.None;
             lightZTrackBar.Value = -280;
@@ -571,7 +588,7 @@ namespace _3d_graphics_editor
             lightYTrackBar.Maximum = 300;
             lightYTrackBar.Minimum = -300;
             lightYTrackBar.Name = "lightYTrackBar";
-            lightYTrackBar.Size = new Size(160, 24);
+            lightYTrackBar.Size = new Size(230, 24);
             lightYTrackBar.TabIndex = 3;
             lightYTrackBar.TickStyle = TickStyle.None;
             lightYTrackBar.Value = 180;
@@ -592,7 +609,7 @@ namespace _3d_graphics_editor
             lightXTrackBar.Maximum = 300;
             lightXTrackBar.Minimum = -300;
             lightXTrackBar.Name = "lightXTrackBar";
-            lightXTrackBar.Size = new Size(160, 24);
+            lightXTrackBar.Size = new Size(230, 24);
             lightXTrackBar.TabIndex = 1;
             lightXTrackBar.TickStyle = TickStyle.None;
             lightXTrackBar.Value = -160;
@@ -606,6 +623,61 @@ namespace _3d_graphics_editor
             lightXLabel.TabIndex = 0;
             lightXLabel.Text = "X: -1.60";
             //
+            // lightingComponentGroupBox
+            //
+            lightingComponentGroupBox.Controls.Add(specularComponentRadioButton);
+            lightingComponentGroupBox.Controls.Add(diffuseComponentRadioButton);
+            lightingComponentGroupBox.Controls.Add(ambientComponentRadioButton);
+            lightingComponentGroupBox.Controls.Add(totalLightingRadioButton);
+            lightingComponentGroupBox.Location = new Point(0, 502);
+            lightingComponentGroupBox.Name = "lightingComponentGroupBox";
+            lightingComponentGroupBox.Size = new Size(346, 86);
+            lightingComponentGroupBox.TabIndex = 5;
+            lightingComponentGroupBox.TabStop = false;
+            lightingComponentGroupBox.Text = "Componente exibido";
+            //
+            // specularComponentRadioButton
+            //
+            specularComponentRadioButton.AutoSize = true;
+            specularComponentRadioButton.Location = new Point(120, 52);
+            specularComponentRadioButton.Name = "specularComponentRadioButton";
+            specularComponentRadioButton.Size = new Size(79, 19);
+            specularComponentRadioButton.TabIndex = 3;
+            specularComponentRadioButton.Text = "Especular";
+            specularComponentRadioButton.UseVisualStyleBackColor = true;
+            //
+            // diffuseComponentRadioButton
+            //
+            diffuseComponentRadioButton.AutoSize = true;
+            diffuseComponentRadioButton.Location = new Point(240, 24);
+            diffuseComponentRadioButton.Name = "diffuseComponentRadioButton";
+            diffuseComponentRadioButton.Size = new Size(59, 19);
+            diffuseComponentRadioButton.TabIndex = 2;
+            diffuseComponentRadioButton.Text = "Difusa";
+            diffuseComponentRadioButton.UseVisualStyleBackColor = true;
+            //
+            // ambientComponentRadioButton
+            //
+            ambientComponentRadioButton.AutoSize = true;
+            ambientComponentRadioButton.Location = new Point(120, 24);
+            ambientComponentRadioButton.Name = "ambientComponentRadioButton";
+            ambientComponentRadioButton.Size = new Size(78, 19);
+            ambientComponentRadioButton.TabIndex = 1;
+            ambientComponentRadioButton.Text = "Ambiente";
+            ambientComponentRadioButton.UseVisualStyleBackColor = true;
+            //
+            // totalLightingRadioButton
+            //
+            totalLightingRadioButton.AutoSize = true;
+            totalLightingRadioButton.Checked = true;
+            totalLightingRadioButton.Location = new Point(18, 24);
+            totalLightingRadioButton.Name = "totalLightingRadioButton";
+            totalLightingRadioButton.Size = new Size(51, 19);
+            totalLightingRadioButton.TabIndex = 0;
+            totalLightingRadioButton.TabStop = true;
+            totalLightingRadioButton.Text = "Total";
+            totalLightingRadioButton.UseVisualStyleBackColor = true;
+            //
             // specularLightingGroupBox
             //
             specularLightingGroupBox.Controls.Add(shininessTrackBar);
@@ -614,7 +686,7 @@ namespace _3d_graphics_editor
             specularLightingGroupBox.Controls.Add(specularIntensityLabel);
             specularLightingGroupBox.Location = new Point(0, 268);
             specularLightingGroupBox.Name = "specularLightingGroupBox";
-            specularLightingGroupBox.Size = new Size(276, 102);
+            specularLightingGroupBox.Size = new Size(346, 102);
             specularLightingGroupBox.TabIndex = 3;
             specularLightingGroupBox.TabStop = false;
             specularLightingGroupBox.Text = "Especular";
@@ -626,7 +698,7 @@ namespace _3d_graphics_editor
             shininessTrackBar.Maximum = 128;
             shininessTrackBar.Minimum = 1;
             shininessTrackBar.Name = "shininessTrackBar";
-            shininessTrackBar.Size = new Size(160, 28);
+            shininessTrackBar.Size = new Size(230, 28);
             shininessTrackBar.TabIndex = 3;
             shininessTrackBar.TickStyle = TickStyle.None;
             shininessTrackBar.Value = 32;
@@ -646,7 +718,7 @@ namespace _3d_graphics_editor
             specularIntensityTrackBar.Location = new Point(18, 44);
             specularIntensityTrackBar.Maximum = 100;
             specularIntensityTrackBar.Name = "specularIntensityTrackBar";
-            specularIntensityTrackBar.Size = new Size(240, 28);
+            specularIntensityTrackBar.Size = new Size(310, 28);
             specularIntensityTrackBar.TabIndex = 1;
             specularIntensityTrackBar.TickStyle = TickStyle.None;
             specularIntensityTrackBar.Value = 72;
@@ -666,7 +738,7 @@ namespace _3d_graphics_editor
             diffuseLightingGroupBox.Controls.Add(diffuseIntensityLabel);
             diffuseLightingGroupBox.Location = new Point(0, 198);
             diffuseLightingGroupBox.Name = "diffuseLightingGroupBox";
-            diffuseLightingGroupBox.Size = new Size(276, 62);
+            diffuseLightingGroupBox.Size = new Size(346, 62);
             diffuseLightingGroupBox.TabIndex = 2;
             diffuseLightingGroupBox.TabStop = false;
             diffuseLightingGroupBox.Text = "Difusa";
@@ -677,7 +749,7 @@ namespace _3d_graphics_editor
             diffuseIntensityTrackBar.Location = new Point(18, 40);
             diffuseIntensityTrackBar.Maximum = 100;
             diffuseIntensityTrackBar.Name = "diffuseIntensityTrackBar";
-            diffuseIntensityTrackBar.Size = new Size(240, 28);
+            diffuseIntensityTrackBar.Size = new Size(310, 28);
             diffuseIntensityTrackBar.TabIndex = 1;
             diffuseIntensityTrackBar.TickStyle = TickStyle.None;
             diffuseIntensityTrackBar.Value = 82;
@@ -697,7 +769,7 @@ namespace _3d_graphics_editor
             ambientLightingGroupBox.Controls.Add(ambientIntensityLabel);
             ambientLightingGroupBox.Location = new Point(0, 128);
             ambientLightingGroupBox.Name = "ambientLightingGroupBox";
-            ambientLightingGroupBox.Size = new Size(276, 62);
+            ambientLightingGroupBox.Size = new Size(346, 62);
             ambientLightingGroupBox.TabIndex = 1;
             ambientLightingGroupBox.TabStop = false;
             ambientLightingGroupBox.Text = "Ambiente";
@@ -708,7 +780,7 @@ namespace _3d_graphics_editor
             ambientIntensityTrackBar.Location = new Point(18, 40);
             ambientIntensityTrackBar.Maximum = 100;
             ambientIntensityTrackBar.Name = "ambientIntensityTrackBar";
-            ambientIntensityTrackBar.Size = new Size(240, 28);
+            ambientIntensityTrackBar.Size = new Size(310, 28);
             ambientIntensityTrackBar.TabIndex = 1;
             ambientIntensityTrackBar.TickStyle = TickStyle.None;
             ambientIntensityTrackBar.Value = 18;
@@ -733,10 +805,10 @@ namespace _3d_graphics_editor
             shadingGroupBox.Controls.Add(fillFacesCheckBox);
             shadingGroupBox.Location = new Point(0, 0);
             shadingGroupBox.Name = "shadingGroupBox";
-            shadingGroupBox.Size = new Size(276, 120);
+            shadingGroupBox.Size = new Size(346, 120);
             shadingGroupBox.TabIndex = 0;
             shadingGroupBox.TabStop = false;
-            shadingGroupBox.Text = "Tonalizacao";
+            shadingGroupBox.Text = "Tonalização";
             //
             // lightColorButton
             //
@@ -805,12 +877,14 @@ namespace _3d_graphics_editor
             //
             // transformPagePanel
             //
+            transformPagePanel.AutoScroll = true;
             transformPagePanel.Controls.Add(scaleGroupBox);
             transformPagePanel.Controls.Add(translationGroupBox);
             transformPagePanel.Controls.Add(rotationGroupBox);
+            transformPagePanel.Dock = DockStyle.Fill;
             transformPagePanel.Location = new Point(0, 0);
             transformPagePanel.Name = "transformPagePanel";
-            transformPagePanel.Size = new Size(276, 494);
+            transformPagePanel.Size = new Size(364, 494);
             transformPagePanel.TabIndex = 0;
             //
             // scaleGroupBox
@@ -822,7 +896,7 @@ namespace _3d_graphics_editor
             scaleGroupBox.Controls.Add(scaleXCheckBox);
             scaleGroupBox.Location = new Point(0, 176);
             scaleGroupBox.Name = "scaleGroupBox";
-            scaleGroupBox.Size = new Size(276, 76);
+            scaleGroupBox.Size = new Size(346, 76);
             scaleGroupBox.TabIndex = 2;
             scaleGroupBox.TabStop = false;
             scaleGroupBox.Text = "Escala no scroll";
@@ -832,9 +906,9 @@ namespace _3d_graphics_editor
             scaleHintLabel.ForeColor = Color.FromArgb(96, 106, 118);
             scaleHintLabel.Location = new Point(18, 47);
             scaleHintLabel.Name = "scaleHintLabel";
-            scaleHintLabel.Size = new Size(243, 15);
+            scaleHintLabel.Size = new Size(310, 15);
             scaleHintLabel.TabIndex = 4;
-            scaleHintLabel.Text = "Marque varios eixos ou XYZ para todos.";
+            scaleHintLabel.Text = "Marque vários eixos ou XYZ para todos.";
             //
             // scaleAllCheckBox
             //
@@ -893,19 +967,19 @@ namespace _3d_graphics_editor
             translationGroupBox.Controls.Add(translationXCheckBox);
             translationGroupBox.Location = new Point(0, 88);
             translationGroupBox.Name = "translationGroupBox";
-            translationGroupBox.Size = new Size(276, 80);
+            translationGroupBox.Size = new Size(346, 80);
             translationGroupBox.TabIndex = 1;
             translationGroupBox.TabStop = false;
-            translationGroupBox.Text = "Translacao no botao direito";
+            translationGroupBox.Text = "Translação no botão direito";
             //
             // translationHintLabel
             //
             translationHintLabel.ForeColor = Color.FromArgb(96, 106, 118);
             translationHintLabel.Location = new Point(18, 49);
             translationHintLabel.Name = "translationHintLabel";
-            translationHintLabel.Size = new Size(243, 15);
+            translationHintLabel.Size = new Size(310, 15);
             translationHintLabel.TabIndex = 4;
-            translationHintLabel.Text = "Marque varios eixos ou XYZ para todos.";
+            translationHintLabel.Text = "Marque vários eixos ou XYZ para todos.";
             //
             // translationAllCheckBox
             //
@@ -960,19 +1034,19 @@ namespace _3d_graphics_editor
             rotationGroupBox.Controls.Add(rotationXCheckBox);
             rotationGroupBox.Location = new Point(0, 0);
             rotationGroupBox.Name = "rotationGroupBox";
-            rotationGroupBox.Size = new Size(276, 80);
+            rotationGroupBox.Size = new Size(346, 80);
             rotationGroupBox.TabIndex = 0;
             rotationGroupBox.TabStop = false;
-            rotationGroupBox.Text = "Rotacao no botao esquerdo";
+            rotationGroupBox.Text = "Rotação no botão esquerdo";
             //
             // rotationHintLabel
             //
             rotationHintLabel.ForeColor = Color.FromArgb(96, 106, 118);
             rotationHintLabel.Location = new Point(18, 49);
             rotationHintLabel.Name = "rotationHintLabel";
-            rotationHintLabel.Size = new Size(243, 15);
+            rotationHintLabel.Size = new Size(310, 15);
             rotationHintLabel.TabIndex = 4;
-            rotationHintLabel.Text = "Marque varios eixos ou XYZ para todos.";
+            rotationHintLabel.Text = "Marque vários eixos ou XYZ para todos.";
             //
             // rotationAllCheckBox
             //
@@ -1023,7 +1097,7 @@ namespace _3d_graphics_editor
             renderGroupBox.Controls.Add(showBackFacesCheckBox);
             renderGroupBox.Location = new Point(18, 164);
             renderGroupBox.Name = "renderGroupBox";
-            renderGroupBox.Size = new Size(276, 50);
+            renderGroupBox.Size = new Size(364, 50);
             renderGroupBox.TabIndex = 6;
             renderGroupBox.TabStop = false;
             renderGroupBox.Text = "Faces";
@@ -1041,8 +1115,6 @@ namespace _3d_graphics_editor
             // fillFacesCheckBox
             //
             fillFacesCheckBox.AutoSize = true;
-            fillFacesCheckBox.Checked = true;
-            fillFacesCheckBox.CheckState = CheckState.Checked;
             fillFacesCheckBox.Location = new Point(18, 22);
             fillFacesCheckBox.Name = "fillFacesCheckBox";
             fillFacesCheckBox.Size = new Size(109, 19);
@@ -1053,21 +1125,21 @@ namespace _3d_graphics_editor
             // projectionViewButton
             //
             projectionViewButton.FlatStyle = FlatStyle.Flat;
-            projectionViewButton.Location = new Point(112, 124);
+            projectionViewButton.Location = new Point(142, 124);
             projectionViewButton.Name = "projectionViewButton";
-            projectionViewButton.Size = new Size(88, 30);
+            projectionViewButton.Size = new Size(116, 30);
             projectionViewButton.TabIndex = 5;
-            projectionViewButton.Text = "Projecao";
+            projectionViewButton.Text = "Projeção";
             projectionViewButton.UseVisualStyleBackColor = true;
             //
             // lightingViewButton
             //
             lightingViewButton.FlatStyle = FlatStyle.Flat;
-            lightingViewButton.Location = new Point(206, 124);
+            lightingViewButton.Location = new Point(266, 124);
             lightingViewButton.Name = "lightingViewButton";
-            lightingViewButton.Size = new Size(88, 30);
+            lightingViewButton.Size = new Size(116, 30);
             lightingViewButton.TabIndex = 6;
-            lightingViewButton.Text = "Iluminacao";
+            lightingViewButton.Text = "Iluminação";
             lightingViewButton.UseVisualStyleBackColor = true;
             //
             // transformViewButton
@@ -1075,25 +1147,25 @@ namespace _3d_graphics_editor
             transformViewButton.FlatStyle = FlatStyle.Flat;
             transformViewButton.Location = new Point(18, 124);
             transformViewButton.Name = "transformViewButton";
-            transformViewButton.Size = new Size(88, 30);
+            transformViewButton.Size = new Size(116, 30);
             transformViewButton.TabIndex = 4;
-            transformViewButton.Text = "Transformacao";
+            transformViewButton.Text = "Transformação";
             transformViewButton.UseVisualStyleBackColor = true;
             //
             // resetViewButton
             //
             resetViewButton.Location = new Point(18, 84);
             resetViewButton.Name = "resetViewButton";
-            resetViewButton.Size = new Size(276, 32);
+            resetViewButton.Size = new Size(364, 32);
             resetViewButton.TabIndex = 3;
-            resetViewButton.Text = "Resetar transformacoes";
+            resetViewButton.Text = "Resetar";
             resetViewButton.UseVisualStyleBackColor = true;
             //
             // clearButton
             //
-            clearButton.Location = new Point(160, 46);
+            clearButton.Location = new Point(206, 46);
             clearButton.Name = "clearButton";
-            clearButton.Size = new Size(134, 30);
+            clearButton.Size = new Size(176, 30);
             clearButton.TabIndex = 2;
             clearButton.Text = "Limpar";
             clearButton.UseVisualStyleBackColor = true;
@@ -1102,7 +1174,7 @@ namespace _3d_graphics_editor
             //
             openButton.Location = new Point(18, 46);
             openButton.Name = "openButton";
-            openButton.Size = new Size(134, 30);
+            openButton.Size = new Size(176, 30);
             openButton.TabIndex = 1;
             openButton.Text = "Abrir .obj";
             openButton.UseVisualStyleBackColor = true;
@@ -1113,7 +1185,7 @@ namespace _3d_graphics_editor
             sidebarTitleLabel.ForeColor = Color.FromArgb(33, 43, 55);
             sidebarTitleLabel.Location = new Point(18, 18);
             sidebarTitleLabel.Name = "sidebarTitleLabel";
-            sidebarTitleLabel.Size = new Size(276, 28);
+            sidebarTitleLabel.Size = new Size(364, 28);
             sidebarTitleLabel.TabIndex = 0;
             sidebarTitleLabel.Text = "Ferramentas 3D";
             //
@@ -1150,6 +1222,8 @@ namespace _3d_graphics_editor
             ((System.ComponentModel.ISupportInitialize)lightZTrackBar).EndInit();
             ((System.ComponentModel.ISupportInitialize)lightYTrackBar).EndInit();
             ((System.ComponentModel.ISupportInitialize)lightXTrackBar).EndInit();
+            lightingComponentGroupBox.ResumeLayout(false);
+            lightingComponentGroupBox.PerformLayout();
             specularLightingGroupBox.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)shininessTrackBar).EndInit();
             ((System.ComponentModel.ISupportInitialize)specularIntensityTrackBar).EndInit();
