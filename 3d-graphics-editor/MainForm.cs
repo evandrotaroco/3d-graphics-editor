@@ -115,6 +115,7 @@ namespace _3d_graphics_editor
             lightXTrackBar.ValueChanged += LightingControl_ValueChanged;
             lightYTrackBar.ValueChanged += LightingControl_ValueChanged;
             lightZTrackBar.ValueChanged += LightingControl_ValueChanged;
+            showLightMarkerCheckBox.CheckedChanged += RenderOptionCheckBox_CheckedChanged;
             totalLightingRadioButton.CheckedChanged += LightingControl_ValueChanged;
             ambientComponentRadioButton.CheckedChanged += LightingControl_ValueChanged;
             diffuseComponentRadioButton.CheckedChanged += LightingControl_ValueChanged;
@@ -808,7 +809,7 @@ namespace _3d_graphics_editor
                 mode,
                 projection,
                 BuildProjectionParameters(),
-                _sidebarView == SidebarView.Lighting && fillFacesCheckBox.Checked,
+                _sidebarView == SidebarView.Lighting && showLightMarkerCheckBox.Checked,
                 GetSelectedShadingMode(),
                 BuildLightingOptions());
         }

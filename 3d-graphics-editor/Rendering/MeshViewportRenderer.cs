@@ -17,7 +17,6 @@ namespace _3d_graphics_editor.Rendering
         private const float PerspectiveBaseDepthOffset = 2f;
         private const float DepthEpsilon = 0.0001f;
         private const float EdgeDepthEpsilon = 0.01f;
-        private const float LightMarkerDistance = 1.8f;
         private const int TransparentPixel = 0;
         private static readonly Color ViewportBackgroundColor = Color.White;
         private static readonly Color BorderColor = Color.FromArgb(120, 138, 160);
@@ -764,12 +763,6 @@ namespace _3d_graphics_editor.Rendering
                 lightPoint.Z += MapPerspectiveZOffsetToDepth(parameters.PerspectiveZOffset);
             }
 
-            var lightDirection = Normalize(Subtract(lightPoint, modelCenter));
-            lightPoint = new Vector3D(
-                modelCenter.X + (lightDirection.X * LightMarkerDistance),
-                modelCenter.Y + (lightDirection.Y * LightMarkerDistance),
-                modelCenter.Z + (lightDirection.Z * LightMarkerDistance));
-
             if (!TryProject(lightPoint, bounds, projection, parameters, out var lightScreenPoint) ||
                 !TryProject(modelCenter, bounds, projection, parameters, out var centerScreenPoint))
             {
@@ -777,7 +770,6 @@ namespace _3d_graphics_editor.Rendering
             }
 
             const float radius = 7f;
-            lightScreenPoint = ClampPointToBounds(lightScreenPoint, bounds, radius + 1f);
             using var rayPen = new Pen(Color.FromArgb(170, 192, 138, 0), 1.4f)
             {
                 DashStyle = DashStyle.Dash
@@ -798,29 +790,6 @@ namespace _3d_graphics_editor.Rendering
                 lightScreenPoint.Y - radius,
                 radius * 2f,
                 radius * 2f);
-        }
-
-        // Mantem um ponto dentro da area visivel, respeitando uma margem.
-        private static PointF ClampPointToBounds(PointF point, Rectangle bounds, float margin)
-        {
-            var minX = bounds.Left + margin;
-            var maxX = bounds.Right - margin;
-            var minY = bounds.Top + margin;
-            var maxY = bounds.Bottom - margin;
-
-            if (minX > maxX)
-            {
-                (minX, maxX) = (maxX, minX);
-            }
-
-            if (minY > maxY)
-            {
-                (minY, maxY) = (maxY, minY);
-            }
-
-            return new PointF(
-                Math.Clamp(point.X, minX, maxX),
-                Math.Clamp(point.Y, minY, maxY));
         }
 
         // Decide se o modelo sera desenhado preenchido, com arestas ou apenas em wireframe.
