@@ -577,12 +577,7 @@ namespace _3d_graphics_editor.Rendering
             };
 
             var projectionScale = Math.Min(bounds.Width, bounds.Height) * ParallelProjectionScaleFactor;
-            var centerX = bounds.Left + bounds.Width / 2f;
-            var centerY = bounds.Top + bounds.Height / 2f;
-
-            projectedPoint = new PointF(
-                centerX + horizontal * projectionScale,
-                centerY - vertical * projectionScale);
+            projectedPoint = ProjectToViewportAxes(bounds, horizontal, vertical, projectionScale);
 
             return true;
         }
@@ -601,12 +596,7 @@ namespace _3d_graphics_editor.Rendering
 
             var projectionScale = Math.Min(bounds.Width, bounds.Height) * PerspectiveScaleFactor;
             var perspective = projectionScale / depth;
-            var centerX = bounds.Left + bounds.Width / 2f;
-            var centerY = bounds.Top + bounds.Height / 2f;
-
-            projectedPoint = new PointF(
-                centerX + point.X * perspective,
-                centerY - point.Y * perspective);
+            projectedPoint = ProjectToViewportAxes(bounds, point.X, point.Y, perspective);
 
             return true;
         }
@@ -628,15 +618,11 @@ namespace _3d_graphics_editor.Rendering
                 return false;
             }
 
-            var centerX = bounds.Left + bounds.Width / 2f;
-            var centerY = bounds.Top + bounds.Height / 2f;
             var projectedX = point.X * focalDistance / depth;
             var projectedY = point.Y * focalDistance / depth;
             var screenScale = Math.Min(bounds.Width, bounds.Height) / OnePointPerspectiveScreenDivisor;
 
-            projectedPoint = new PointF(
-                centerX + projectedX * screenScale,
-                centerY - projectedY * screenScale);
+            projectedPoint = ProjectToViewportAxes(bounds, projectedX, projectedY, screenScale);
 
             return true;
         }
@@ -654,14 +640,19 @@ namespace _3d_graphics_editor.Rendering
             var horizontal = point.X + (point.Z * depthFactor * MathF.Cos(alpha));
             var vertical = point.Y + (point.Z * depthFactor * MathF.Sin(alpha));
             var projectionScale = Math.Min(bounds.Width, bounds.Height) * ParallelProjectionScaleFactor;
+            projectedPoint = ProjectToViewportAxes(bounds, horizontal, vertical, projectionScale);
+
+            return true;
+        }
+
+        private static PointF ProjectToViewportAxes(Rectangle bounds, float horizontal, float vertical, float scale)
+        {
             var centerX = bounds.Left + bounds.Width / 2f;
             var centerY = bounds.Top + bounds.Height / 2f;
 
-            projectedPoint = new PointF(
-                centerX + horizontal * projectionScale,
-                centerY - vertical * projectionScale);
-
-            return true;
+            return new PointF(
+                centerX + horizontal * scale,
+                centerY - vertical * scale);
         }
 
         private static bool IsFrontFace(
