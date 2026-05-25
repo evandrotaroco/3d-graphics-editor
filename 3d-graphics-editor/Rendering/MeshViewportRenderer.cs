@@ -896,16 +896,16 @@ namespace _3d_graphics_editor.Rendering
             var depthSamples = new double[face.ScreenVertices.Length];
             var vertexColors = new ColorVector[face.ScreenVertices.Length];
             var effectiveShadingMode = useUniformColor ? ShadingMode.Flat : shadingMode;
-            var flatColorArgb = useUniformColor
-                ? materialColor.ToArgb()
-                : ColorVectorToArgb(CalculateIlluminatedColor(face.FaceNormal, face.Center, materialColor, lighting));
+            var flatColorArgb = 0;
+            var hasFlatColorArgb = false;
+            var needsVertexColors = writeColor && effectiveShadingMode == ShadingMode.Gouraud;
 
             for (var i = 0; i < face.ScreenVertices.Length; i++)
             {
                 points[i] = ToBitmapPoint(face.ScreenVertices[i].Point, bounds);
                 depthSamples[i] = ToDepthSample(face.ScreenVertices[i].Depth, face.UseReciprocalDepthInterpolation);
 
-                if (effectiveShadingMode == ShadingMode.Gouraud)
+                if (needsVertexColors)
                 {
                     vertexColors[i] = CalculateIlluminatedColor(
                         face.ScreenVertices[i].Normal,
@@ -1073,21 +1073,42 @@ namespace _3d_graphics_editor.Rendering
                     for (var x = clippedXStart; x < clippedXEnd; x++)
                     {
                         var depth = FromDepthSample(depthSample, face.UseReciprocalDepthInterpolation);
-                        var pixelColorArgb = flatColorArgb;
-                        if (writeColor && effectiveShadingMode == ShadingMode.Gouraud)
+                        if (TryUpdateVisibleDepth(x, y, width, height, depth, DepthEpsilon, out var pixelIndex) &&
+                            writeColor)
                         {
-                            pixelColorArgb = ColorVectorToArgb(new ColorVector((float)red, (float)green, (float)blue));
-                        }
-                        else if (writeColor && effectiveShadingMode == ShadingMode.Phong)
-                        {
-                            pixelColorArgb = ColorVectorToArgb(CalculateIlluminatedColor(
-                                new Vector3D((float)normalX, (float)normalY, (float)normalZ),
-                                new Vector3D((float)positionX, (float)positionY, (float)positionZ),
-                                materialColor,
-                                lighting));
+                            var pixelColorArgb = flatColorArgb;
+                            if (effectiveShadingMode == ShadingMode.Flat)
+                            {
+                                if (!hasFlatColorArgb)
+                                {
+                                    flatColorArgb = useUniformColor
+                                        ? materialColor.ToArgb()
+                                        : ColorVectorToArgb(CalculateIlluminatedColor(
+                                            face.FaceNormal,
+                                            face.Center,
+                                            materialColor,
+                                            lighting));
+                                    hasFlatColorArgb = true;
+                                }
+
+                                pixelColorArgb = flatColorArgb;
+                            }
+                            else if (effectiveShadingMode == ShadingMode.Gouraud)
+                            {
+                                pixelColorArgb = ColorVectorToArgb(new ColorVector((float)red, (float)green, (float)blue));
+                            }
+                            else if (effectiveShadingMode == ShadingMode.Phong)
+                            {
+                                pixelColorArgb = ColorVectorToArgb(CalculateIlluminatedColor(
+                                    new Vector3D((float)normalX, (float)normalY, (float)normalZ),
+                                    new Vector3D((float)positionX, (float)positionY, (float)positionZ),
+                                    materialColor,
+                                    lighting));
+                            }
+
+                            _colorBuffer[pixelIndex] = pixelColorArgb;
                         }
 
-                        TryWritePixel(x, y, width, height, depth, writeColor, pixelColorArgb, DepthEpsilon);
                         depthSample += depthIncrement;
                         red += redIncrement;
                         green += greenIncrement;
@@ -1387,32 +1408,29 @@ namespace _3d_graphics_editor.Rendering
             SetPixelSafe(scan0, stride, width, height, x, y, color);
         }
 
-        private void TryWritePixel(
+        private bool TryUpdateVisibleDepth(
             int x,
             int y,
             int width,
             int height,
             float depth,
-            bool writeColor,
-            int colorArgb,
-            float depthEpsilon)
+            float depthEpsilon,
+            out int index)
         {
+            index = -1;
             if (x < 0 || x >= width || y < 0 || y >= height || float.IsNaN(depth))
             {
-                return;
+                return false;
             }
 
-            var index = (y * width) + x;
+            index = (y * width) + x;
             if (depth > _zBuffer[index] + depthEpsilon)
             {
-                return;
+                return false;
             }
 
             _zBuffer[index] = depth;
-            if (writeColor)
-            {
-                _colorBuffer[index] = colorArgb;
-            }
+            return true;
         }
 
         private void CopyColorBufferToBitmap(int width, int height)
