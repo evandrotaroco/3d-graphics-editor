@@ -19,8 +19,19 @@ namespace _3d_graphics_editor
         private const int DefaultPerspectiveRotationYDegrees = 0;
         private const int DefaultPerspectiveZOffset = 200;
         private const int ContributionProgressMaximum = 1000;
+        private const int ProjectionThumbnailWidth = 86;
+        private const int ProjectionThumbnailHeight = 78;
 
         private readonly MeshViewportRenderer _renderer = new();
+        private static readonly ProjectionView[] ProjectionThumbnailViews =
+        [
+            ProjectionView.Frontal,
+            ProjectionView.Superior,
+            ProjectionView.Lateral,
+            ProjectionView.Cavalier,
+            ProjectionView.Cabinet,
+            ProjectionView.OnePointPerspective
+        ];
 
         private GroupBox? _lightingContributionGroupBox;
         private ProgressBar? _ambientContributionProgressBar;
@@ -38,9 +49,9 @@ namespace _3d_graphics_editor
         private bool _isUpdatingAxisSelection;
         private bool _isUpdatingProjectionSelection;
         private bool _projectionThumbnailsDirty;
-        private int _projectionThumbnailVersion;
         private SidebarView _sidebarView = SidebarView.Transform;
         private readonly System.Windows.Forms.Timer _projectionThumbnailUpdateTimer = new();
+        private readonly Dictionary<ProjectionView, PictureBox> _projectionThumbnailPictureBoxes = [];
 
         public MainForm()
         {
@@ -48,6 +59,7 @@ namespace _3d_graphics_editor
 
             ApplyColorButtonTextColor(lightColorButton);
             ConfigureProjectionThumbnailUpdateTimer();
+            ConfigureProjectionThumbnailControls();
             ConfigureLightingContributionPanel();
             AttachEvents();
             ResetViewState();
@@ -110,20 +122,55 @@ namespace _3d_graphics_editor
             lightColorButton.Click += (_, _) => ChooseLightingColor(lightColorButton);
 
             viewportPanel.Paint += ViewportPanel_Paint;
-            viewportPanel.Resize += (_, _) => viewportPanel.Invalidate();
+            viewportPanel.Resize += (_, _) =>
+            {
+                LayoutProjectionThumbnailsPanel();
+                viewportPanel.Invalidate();
+            };
             viewportPanel.MouseDown += ViewportPanel_MouseDown;
             viewportPanel.MouseMove += ViewportPanel_MouseMove;
             viewportPanel.MouseUp += ViewportPanel_MouseUp;
             viewportPanel.MouseLeave += ViewportPanel_MouseLeave;
             viewportPanel.MouseWheel += ViewportPanel_MouseWheel;
             viewportPanel.MouseEnter += (_, _) => viewportPanel.Focus();
-            FormClosed += (_, _) => _projectionThumbnailUpdateTimer.Dispose();
+            FormClosed += (_, _) =>
+            {
+                _projectionThumbnailUpdateTimer.Dispose();
+                DisposeProjectionThumbnailImages();
+            };
         }
 
         private void ConfigureProjectionThumbnailUpdateTimer()
         {
             _projectionThumbnailUpdateTimer.Interval = 180;
             _projectionThumbnailUpdateTimer.Tick += ProjectionThumbnailUpdateTimer_Tick;
+        }
+
+        private void ConfigureProjectionThumbnailControls()
+        {
+            projectionThumbnailsPanel.SuspendLayout();
+
+            foreach (var view in ProjectionThumbnailViews)
+            {
+                var projection = view;
+                var pictureBox = new PictureBox
+                {
+                    Cursor = Cursors.Hand,
+                    Margin = new Padding(0, 0, 4, 0),
+                    Name = $"{projection}ThumbnailPictureBox",
+                    Size = new Size(ProjectionThumbnailWidth, ProjectionThumbnailHeight),
+                    SizeMode = PictureBoxSizeMode.Normal,
+                    TabStop = false
+                };
+
+                pictureBox.Click += (_, _) => SelectProjectionThumbnail(projection);
+                projectionThumbnailsPanel.Controls.Add(pictureBox);
+                _projectionThumbnailPictureBoxes[projection] = pictureBox;
+            }
+
+            projectionThumbnailsPanel.ResumeLayout();
+            projectionThumbnailsPanel.BringToFront();
+            LayoutProjectionThumbnailsPanel();
         }
 
         private void ConfigureLightingContributionPanel()
@@ -592,6 +639,27 @@ namespace _3d_graphics_editor
             UpdateProjectionControlTexts();
         }
 
+        private void SelectProjectionThumbnail(ProjectionView projection)
+        {
+            if (_currentMesh is null)
+            {
+                return;
+            }
+
+            var radioButton = projection switch
+            {
+                ProjectionView.Frontal => frontalProjectionRadioButton,
+                ProjectionView.Superior => superiorProjectionRadioButton,
+                ProjectionView.Lateral => lateralProjectionRadioButton,
+                ProjectionView.Cabinet => cabinetProjectionRadioButton,
+                ProjectionView.OnePointPerspective => onePointPerspectiveRadioButton,
+                _ => cavalierProjectionRadioButton
+            };
+
+            radioButton.Checked = true;
+            viewportPanel.Focus();
+        }
+
         private void MarkProjectionThumbnailsDirty()
         {
             _projectionThumbnailsDirty = true;
@@ -612,7 +680,7 @@ namespace _3d_graphics_editor
         {
             _projectionThumbnailUpdateTimer.Stop();
             _projectionThumbnailsDirty = false;
-            _projectionThumbnailVersion++;
+            RenderProjectionThumbnailControls();
         }
 
         private void RefreshProjectionThumbnailsIfDirty()
@@ -624,6 +692,69 @@ namespace _3d_graphics_editor
 
             RefreshProjectionThumbnails();
             viewportPanel.Invalidate();
+        }
+
+        private void RenderProjectionThumbnailControls()
+        {
+            if (_currentMesh is null || !showProjectionThumbnailsCheckBox.Checked)
+            {
+                DisposeProjectionThumbnailImages();
+                UpdateProjectionThumbnailsPanel();
+                return;
+            }
+
+            var images = _renderer.RenderProjectionThumbnails(
+                _currentMesh,
+                _transform,
+                BuildProjectionThumbnailRenderOptions(),
+                new Size(ProjectionThumbnailWidth, ProjectionThumbnailHeight));
+
+            foreach (var view in ProjectionThumbnailViews)
+            {
+                if (!_projectionThumbnailPictureBoxes.TryGetValue(view, out var pictureBox))
+                {
+                    continue;
+                }
+
+                var previousImage = pictureBox.Image;
+                pictureBox.Image = images.TryGetValue(view, out var image) ? image : null;
+                previousImage?.Dispose();
+            }
+
+            UpdateProjectionThumbnailsPanel();
+        }
+
+        private void DisposeProjectionThumbnailImages()
+        {
+            foreach (var pictureBox in _projectionThumbnailPictureBoxes.Values)
+            {
+                pictureBox.Image?.Dispose();
+                pictureBox.Image = null;
+            }
+        }
+
+        private void UpdateProjectionThumbnailsPanel()
+        {
+            var shouldShow = _currentMesh is not null &&
+                             _sidebarView == SidebarView.Projection &&
+                             showProjectionThumbnailsCheckBox.Checked;
+
+            projectionThumbnailsPanel.Visible = shouldShow;
+            if (!shouldShow)
+            {
+                return;
+            }
+
+            LayoutProjectionThumbnailsPanel();
+            projectionThumbnailsPanel.BringToFront();
+        }
+
+        private void LayoutProjectionThumbnailsPanel()
+        {
+            var preferredSize = projectionThumbnailsPanel.PreferredSize;
+            var x = Math.Max(8, viewportPanel.ClientSize.Width - preferredSize.Width - 18);
+            var y = Math.Max(8, viewportPanel.ClientSize.Height - preferredSize.Height - 18);
+            projectionThumbnailsPanel.Location = new Point(x, y);
         }
 
         private void UpdateUiState()
@@ -657,6 +788,7 @@ namespace _3d_graphics_editor
             viewportPanel.Cursor = hasMesh ? Cursors.SizeAll : Cursors.Default;
             UpdateProjectionControlAvailability(hasMesh);
             UpdateSidebarViewState();
+            UpdateProjectionThumbnailsPanel();
         }
 
         private ViewportRenderOptions BuildRenderOptions()
@@ -676,10 +808,21 @@ namespace _3d_graphics_editor
                 mode,
                 projection,
                 BuildProjectionParameters(),
-                showProjectionThumbnailsCheckBox.Checked,
-                _projectionThumbnailVersion,
                 GetSelectedShadingMode(),
                 BuildLightingOptions());
+        }
+
+        private ViewportRenderOptions BuildProjectionThumbnailRenderOptions()
+        {
+            return new ViewportRenderOptions(
+                fillFacesCheckBox.Checked,
+                showEdgesCheckBox.Checked,
+                showBackFacesCheckBox.Checked,
+                ViewportMode.Projection,
+                GetSelectedProjectionView(),
+                BuildProjectionParameters(),
+                ShadingMode.Flat,
+                LightingOptions.Default);
         }
 
         private bool IsRotationSelector(CheckBox checkBox)

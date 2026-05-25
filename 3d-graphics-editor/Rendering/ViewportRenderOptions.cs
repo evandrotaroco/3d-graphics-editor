@@ -75,8 +75,6 @@ namespace _3d_graphics_editor.Rendering
         ViewportMode Mode,
         ProjectionView Projection,
         ProjectionParameters Parameters,
-        bool ShowProjectionThumbnails,
-        int ProjectionThumbnailVersion,
         ShadingMode ShadingMode,
         LightingOptions Lighting)
     {
@@ -88,8 +86,6 @@ namespace _3d_graphics_editor.Rendering
                 ViewportMode.Transform,
                 ProjectionView.Normal,
                 ProjectionParameters.Default,
-                false,
-                0,
                 ShadingMode.Phong,
                 LightingOptions.Default);
     }

@@ -12,17 +12,13 @@ namespace _3d_graphics_editor.Rendering
         private const float ParallelProjectionScaleFactor = 0.22f;
         private const float OnePointPerspectiveScreenDivisor = 1400f;
         private const float FixedOnePointFocalDistance = 300f;
-        private const float ObliqueAngleDegrees = 45f;
         private const float CavalierDepthFactor = 1f;
         private const float CabinetDepthFactor = 0.5f;
         private const float PerspectiveBaseDepthOffset = 2f;
         private const float DepthEpsilon = 0.0001f;
         private const float EdgeDepthEpsilon = 0.01f;
-        private const int ThumbnailGap = 10;
         private const int TransparentPixel = 0;
-        private static readonly Color BackgroundTopColor = Color.FromArgb(250, 252, 255);
-        private static readonly Color BackgroundBottomColor = Color.FromArgb(224, 231, 239);
-        private static readonly Color GridColor = Color.FromArgb(223, 228, 235);
+        private static readonly Color ViewportBackgroundColor = Color.White;
         private static readonly Color BorderColor = Color.FromArgb(120, 138, 160);
         private static readonly Color EdgeColor = Color.FromArgb(34, 47, 66);
         private static readonly Color PlaceholderColor = Color.FromArgb(92, 108, 126);
@@ -37,16 +33,7 @@ namespace _3d_graphics_editor.Rendering
         private float[] _zBuffer = Array.Empty<float>();
         private int[] _colorBuffer = Array.Empty<int>();
         private Bitmap? _rasterBitmap;
-        private Bitmap? _projectionThumbnailCache;
-        private Mesh? _projectionThumbnailCacheMesh;
-        private int _projectionThumbnailCacheVersion = -1;
-        private Size _projectionThumbnailCacheSize;
-        private ProjectionView _projectionThumbnailCacheProjection;
-        private ProjectionParameters _projectionThumbnailCacheParameters;
-        private bool _projectionThumbnailCacheFillFaces;
-        private bool _projectionThumbnailCacheShowEdges;
-        private bool _projectionThumbnailCacheShowBackFaces;
-
+        // Desenha o viewport inteiro: fundo, modelo, projecao e extras da tela.
         public void Render(
             Graphics graphics,
             Rectangle viewport,
@@ -116,40 +103,55 @@ namespace _3d_graphics_editor.Rendering
             if (options.Mode == ViewportMode.Projection)
             {
                 DrawProjectionModeBadge(graphics, renderBounds, mainProjection, options.Parameters);
-                if (options.ShowProjectionThumbnails)
-                {
-                    DrawProjectionThumbnails(graphics, mesh, transformedVertices, renderBounds, options);
-                }
             }
         }
 
+        // Gera bitmaps pequenos para os PictureBox nativos das miniaturas.
+        public IReadOnlyDictionary<ProjectionView, Bitmap> RenderProjectionThumbnails(
+            Mesh mesh,
+            TransformState transform,
+            ViewportRenderOptions options,
+            Size thumbnailSize)
+        {
+            var images = new Dictionary<ProjectionView, Bitmap>();
+            if (thumbnailSize.Width <= 0 || thumbnailSize.Height <= 0)
+            {
+                return images;
+            }
+
+            var transformedVertices = TransformVertices(mesh, transform);
+            foreach (var preview in CreateProjectionThumbnailDefinitions())
+            {
+                var bitmap = new Bitmap(thumbnailSize.Width, thumbnailSize.Height, PixelFormat.Format32bppArgb);
+                using var graphics = Graphics.FromImage(bitmap);
+                graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                graphics.Clear(Color.Transparent);
+
+                DrawProjectionThumbnail(
+                    graphics,
+                    mesh,
+                    transformedVertices,
+                    new Rectangle(Point.Empty, thumbnailSize),
+                    preview,
+                    options);
+
+                images[preview.View] = bitmap;
+            }
+
+            return images;
+        }
+
+        // Desenha o fundo uniforme e a borda do viewport.
         private static void DrawBackdrop(Graphics graphics, Rectangle bounds)
         {
-            using var gradientBrush = new LinearGradientBrush(bounds, BackgroundTopColor, BackgroundBottomColor, 90f);
-            using var gridPen = new Pen(GridColor, 1f);
+            using var backgroundBrush = new SolidBrush(ViewportBackgroundColor);
             using var borderPen = new Pen(BorderColor, 1.5f);
-            using var axisPen = new Pen(Color.FromArgb(185, 194, 205), 1f);
 
-            graphics.FillRectangle(gradientBrush, bounds);
-
-            const int spacing = 34;
-            for (var x = bounds.Left + spacing; x < bounds.Right; x += spacing)
-            {
-                graphics.DrawLine(gridPen, x, bounds.Top, x, bounds.Bottom);
-            }
-
-            for (var y = bounds.Top + spacing; y < bounds.Bottom; y += spacing)
-            {
-                graphics.DrawLine(gridPen, bounds.Left, y, bounds.Right, y);
-            }
-
-            var centerX = bounds.Left + bounds.Width / 2f;
-            var centerY = bounds.Top + bounds.Height / 2f;
-            graphics.DrawLine(axisPen, bounds.Left, centerY, bounds.Right, centerY);
-            graphics.DrawLine(axisPen, centerX, bounds.Top, centerX, bounds.Bottom);
+            graphics.FillRectangle(backgroundBrush, bounds);
             graphics.DrawRectangle(borderPen, bounds);
         }
 
+        // Mostra uma mensagem quando nao existe modelo carregado.
         private static void DrawEmptyState(Graphics graphics, Rectangle bounds)
         {
             const string title = "Nenhum modelo carregado";
@@ -174,6 +176,7 @@ namespace _3d_graphics_editor.Rendering
             graphics.DrawString(subtitle, subtitleFont, subtitleBrush, subtitlePoint);
         }
 
+        // Aplica centralizacao, normalizacao, escala, rotacao e translacao aos vertices.
         private static Vector3D[] TransformVertices(Mesh mesh, TransformState transform)
         {
             var bounds = ComputeBounds(mesh.Vertices);
@@ -211,6 +214,7 @@ namespace _3d_graphics_editor.Rendering
             return transformed;
         }
 
+        // Rotaciona as normais para elas acompanharem a orientacao do modelo.
         private static Vector3D[] TransformNormals(Mesh mesh, TransformState transform)
         {
             if (mesh.Normals.Count == 0)
@@ -234,6 +238,7 @@ namespace _3d_graphics_editor.Rendering
             return transformed;
         }
 
+        // Gera normais por vertice quando o arquivo nao fornece normais prontas.
         private static Vector3D[] BuildGeneratedVertexNormals(Mesh mesh, Vector3D[] transformedVertices)
         {
             var normals = new Vector3D[transformedVertices.Length];
@@ -284,6 +289,7 @@ namespace _3d_graphics_editor.Rendering
             return normals;
         }
 
+        // Faz ajustes extras nos vertices antes de aplicar a projecao escolhida.
         private static Vector3D[] ApplyProjectionViewTransform(
             Vector3D[] transformedVertices,
             ProjectionView projection,
@@ -312,6 +318,7 @@ namespace _3d_graphics_editor.Rendering
             return adjustedVertices;
         }
 
+        // Faz os mesmos ajustes de projecao nas normais usadas pela iluminacao.
         private static Vector3D[] ApplyProjectionViewNormalTransform(
             Vector3D[] normals,
             ProjectionView projection,
@@ -343,6 +350,7 @@ namespace _3d_graphics_editor.Rendering
             return adjustedNormals;
         }
 
+        // Cria a lista de faces ja prontas para serem desenhadas na tela.
         private static List<RenderableFace> CreateRenderableFaces(
             Mesh mesh,
             Vector3D[] transformedVertices,
@@ -365,6 +373,7 @@ namespace _3d_graphics_editor.Rendering
                 generatedVertexNormals ?? BuildGeneratedVertexNormals(mesh, transformedVertices));
         }
 
+        // Projeta todos os vertices 3D para pontos 2D do viewport.
         private static PointF?[] ProjectVertices(
             Vector3D[] transformedVertices,
             Rectangle bounds,
@@ -383,6 +392,7 @@ namespace _3d_graphics_editor.Rendering
             return projectedVertices;
         }
 
+        // Monta as faces renderizaveis e remove as que nao devem aparecer.
         private static List<RenderableFace> BuildRenderableFaces(
             Mesh mesh,
             Vector3D[] transformedVertices,
@@ -427,6 +437,7 @@ namespace _3d_graphics_editor.Rendering
             return renderableFaces;
         }
 
+        // Tenta converter uma face do modelo em uma face com pontos de tela.
         private static bool TryCreateRenderableFace(
             Mesh mesh,
             Face face,
@@ -484,6 +495,7 @@ namespace _3d_graphics_editor.Rendering
             return true;
         }
 
+        // Escolhe a normal correta de um vertice da face.
         private static Vector3D GetFaceVertexNormal(
             FaceVertex faceVertex,
             Vector3D[] transformedNormals,
@@ -502,6 +514,7 @@ namespace _3d_graphics_editor.Rendering
             return new Vector3D(0f, 0f, -1f);
         }
 
+        // Calcula o ponto medio de uma lista de vertices.
         private static Vector3D ComputeCenter(IReadOnlyList<Vector3D> vertices)
         {
             var center = new Vector3D();
@@ -513,6 +526,7 @@ namespace _3d_graphics_editor.Rendering
             return Divide(center, vertices.Count);
         }
 
+        // Descobre a cor da face a partir do material do modelo.
         private static Color GetFaceColor(Mesh mesh, Face face)
         {
             var baseColor = DefaultFaceColor;
@@ -525,6 +539,7 @@ namespace _3d_graphics_editor.Rendering
             return baseColor;
         }
 
+        // Calcula os limites minimo e maximo ocupados pelo modelo.
         private static (Vector3D Min, Vector3D Max) ComputeBounds(IReadOnlyList<Vertex> vertices)
         {
             var min = new Vector3D(float.MaxValue, float.MaxValue, float.MaxValue);
@@ -544,6 +559,7 @@ namespace _3d_graphics_editor.Rendering
             return (min, max);
         }
 
+        // Escolhe qual formula de projecao deve ser usada para um ponto.
         private static bool TryProject(
             Vector3D point,
             Rectangle bounds,
@@ -563,6 +579,7 @@ namespace _3d_graphics_editor.Rendering
             };
         }
 
+        // Faz projecao ortografica: frontal, superior ou lateral.
         private static bool TryProjectOrthographic(
             Vector3D point,
             Rectangle bounds,
@@ -582,6 +599,7 @@ namespace _3d_graphics_editor.Rendering
             return true;
         }
 
+        // Faz a perspectiva padrao usada na visualizacao normal.
         private static bool TryProjectStandardPerspective(
             Vector3D point,
             Rectangle bounds,
@@ -601,6 +619,7 @@ namespace _3d_graphics_editor.Rendering
             return true;
         }
 
+        // Faz a perspectiva com um ponto de fuga.
         private static bool TryProjectOnePointPerspective(
             Vector3D point,
             Rectangle bounds,
@@ -627,6 +646,7 @@ namespace _3d_graphics_editor.Rendering
             return true;
         }
 
+        // Faz projecao obliqua, usada na cavaleira e na gabinete.
         private static bool TryProjectOblique(
             Vector3D point,
             Rectangle bounds,
@@ -645,6 +665,7 @@ namespace _3d_graphics_editor.Rendering
             return true;
         }
 
+        // Converte coordenadas matematicas para a tela: X cresce para direita e Y para cima.
         private static PointF ProjectToViewportAxes(Rectangle bounds, float horizontal, float vertical, float scale)
         {
             var centerX = bounds.Left + bounds.Width / 2f;
@@ -655,6 +676,7 @@ namespace _3d_graphics_editor.Rendering
                 centerY - vertical * scale);
         }
 
+        // Verifica se a face esta virada para a camera.
         private static bool IsFrontFace(
             Vector3D facePoint,
             Vector3D geometricNormal,
@@ -682,6 +704,7 @@ namespace _3d_graphics_editor.Rendering
             return Dot(viewVector, geometricNormal) < 0f;
         }
 
+        // Calcula a profundidade de um ponto para ordenacao e Z-buffer.
         private static float GetDepthValue(Vector3D point, ProjectionView projection, ProjectionParameters parameters)
         {
             if (IsOrthographicProjection(projection))
@@ -702,6 +725,7 @@ namespace _3d_graphics_editor.Rendering
             return point.Z;
         }
 
+        // Decide se o modelo sera desenhado preenchido, com arestas ou apenas em wireframe.
         private void DrawProjectedMesh(
             Graphics graphics,
             IReadOnlyList<RenderableFace> renderableFaces,
@@ -741,6 +765,7 @@ namespace _3d_graphics_editor.Rendering
             }
         }
 
+        // Desenha faces usando Z-buffer para esconder o que fica atras.
         private void DrawZBufferedMesh(
             Graphics graphics,
             IReadOnlyList<RenderableFace> renderableFaces,
@@ -780,6 +805,7 @@ namespace _3d_graphics_editor.Rendering
                 GraphicsUnit.Pixel);
         }
 
+        // Desenha somente as arestas das faces.
         private unsafe void DrawWireframe(
             Graphics graphics,
             IReadOnlyList<RenderableFace> renderableFaces,
@@ -849,6 +875,7 @@ namespace _3d_graphics_editor.Rendering
                 GraphicsUnit.Pixel);
         }
 
+        // Garante que os buffers e o bitmap tenham tamanho suficiente.
         private void EnsureRasterResources(int width, int height)
         {
             var pixelCount = width * height;
@@ -867,6 +894,7 @@ namespace _3d_graphics_editor.Rendering
             }
         }
 
+        // Preenche uma face linha por linha, interpolando profundidade, cor e normais.
         private void ScanlineFill(
             RenderableFace face,
             Rectangle bounds,
@@ -1130,6 +1158,7 @@ namespace _3d_graphics_editor.Rendering
             }
         }
 
+        // Calcula a cor final de um ponto usando luz ambiente, difusa e especular.
         private static ColorVector CalculateIlluminatedColor(
             Vector3D normal,
             Vector3D position,
@@ -1177,11 +1206,13 @@ namespace _3d_graphics_editor.Rendering
             };
         }
 
+        // Converte uma cor de 0..255 para componentes de 0..1.
         private static ColorVector ColorToVector(Color color)
         {
             return new ColorVector(color.R / 255f, color.G / 255f, color.B / 255f);
         }
 
+        // Limita os componentes da cor para ficarem entre 0 e 1.
         private static ColorVector ClampColor(ColorVector color)
         {
             return new ColorVector(
@@ -1190,6 +1221,7 @@ namespace _3d_graphics_editor.Rendering
                 Clamp01(color.B));
         }
 
+        // Converte a cor calculada para o formato ARGB usado no bitmap.
         private static int ColorVectorToArgb(ColorVector color)
         {
             var red = ToByte(color.R);
@@ -1199,16 +1231,19 @@ namespace _3d_graphics_editor.Rendering
             return (255 << 24) | (red << 16) | (green << 8) | blue;
         }
 
+        // Converte um componente de cor de 0..1 para 0..255.
         private static int ToByte(float value)
         {
             return Math.Clamp((int)MathF.Round(Clamp01(value) * 255f), 0, 255);
         }
 
+        // Limita um valor para o intervalo entre 0 e 1.
         private static float Clamp01(float value)
         {
             return Math.Clamp(value, 0f, 1f);
         }
 
+        // Desenha as arestas por cima das faces ja preenchidas.
         private unsafe void DrawEdgeOverlay(
             IReadOnlyList<RenderableFace> renderableFaces,
             Rectangle bounds,
@@ -1277,6 +1312,7 @@ namespace _3d_graphics_editor.Rendering
             }
         }
 
+        // Desenha uma linha com teste de profundidade em cada pixel.
         private unsafe void DrawDepthTestedLineMidpoint(
             byte* scan0,
             int stride,
@@ -1375,6 +1411,7 @@ namespace _3d_graphics_editor.Rendering
             }
         }
 
+        // Pinta um pixel somente se ele esta dentro da tela e na frente do atual.
         private unsafe void SetPixelSafeWhenVisible(
             byte* scan0,
             int stride,
@@ -1399,6 +1436,7 @@ namespace _3d_graphics_editor.Rendering
             SetPixelSafe(scan0, stride, width, height, x, y, color);
         }
 
+        // Atualiza o Z-buffer quando a nova profundidade esta visivel.
         private bool TryUpdateVisibleDepth(
             int x,
             int y,
@@ -1424,6 +1462,7 @@ namespace _3d_graphics_editor.Rendering
             return true;
         }
 
+        // Copia o buffer de cores para o bitmap que sera mostrado no Graphics.
         private void CopyColorBufferToBitmap(int width, int height)
         {
             var bitmapData = _rasterBitmap!.LockBits(
@@ -1454,6 +1493,7 @@ namespace _3d_graphics_editor.Rendering
             }
         }
 
+        // Prepara a profundidade para interpolacao durante o preenchimento.
         private static double ToDepthSample(float depth, bool useReciprocalDepthInterpolation)
         {
             return useReciprocalDepthInterpolation
@@ -1461,6 +1501,7 @@ namespace _3d_graphics_editor.Rendering
                 : depth;
         }
 
+        // Converte a profundidade interpolada de volta para o valor real.
         private static float FromDepthSample(double depthSample, bool useReciprocalDepthInterpolation)
         {
             if (!useReciprocalDepthInterpolation)
@@ -1473,21 +1514,7 @@ namespace _3d_graphics_editor.Rendering
                 : (float)(1d / depthSample);
         }
 
-        public static unsafe void LineMidpoint(Bitmap bitmap, Point p1, Point p2, Color color)
-        {
-            var rect = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
-            var data = bitmap.LockBits(rect, ImageLockMode.ReadWrite, PixelFormat.Format32bppArgb);
-
-            try
-            {
-                DrawLineMidpoint((byte*)data.Scan0, data.Stride, bitmap.Width, bitmap.Height, p1, p2, color);
-            }
-            finally
-            {
-                bitmap.UnlockBits(data);
-            }
-        }
-
+        // Implementa o algoritmo do ponto medio para desenhar uma linha pixel a pixel.
         private static unsafe void DrawLineMidpoint(
             byte* scan0,
             int stride,
@@ -1571,6 +1598,7 @@ namespace _3d_graphics_editor.Rendering
             }
         }
 
+        // Pinta um pixel se ele estiver dentro dos limites do bitmap.
         private static unsafe void SetPixelSafe(
             byte* scan0,
             int stride,
@@ -1596,6 +1624,7 @@ namespace _3d_graphics_editor.Rendering
             pixel[3] = color.A;
         }
 
+        // Converte um ponto absoluto da tela para coordenada local do bitmap.
         private static Point ToBitmapPoint(PointF point, Rectangle bounds)
         {
             return new Point(
@@ -1603,6 +1632,7 @@ namespace _3d_graphics_editor.Rendering
                 (int)MathF.Round(point.Y - bounds.Top));
         }
 
+        // Desenha a etiqueta com o nome e parametros da projecao atual.
         private static void DrawProjectionModeBadge(
             Graphics graphics,
             Rectangle renderBounds,
@@ -1625,28 +1655,7 @@ namespace _3d_graphics_editor.Rendering
                 badgeBounds.Top + 7);
         }
 
-        private void DrawProjectionThumbnails(
-            Graphics graphics,
-            Mesh mesh,
-            Vector3D[] transformedVertices,
-            Rectangle renderBounds,
-            ViewportRenderOptions options)
-        {
-            var previews = CreateProjectionThumbnailDefinitions();
-            var layout = CalculateProjectionThumbnailLayout(renderBounds, previews.Length);
-            if (layout.TotalWidth <= 0 || layout.ThumbnailHeight <= 0)
-            {
-                return;
-            }
-
-            if (!IsProjectionThumbnailCacheValid(mesh, layout, options))
-            {
-                RebuildProjectionThumbnailCache(mesh, transformedVertices, layout, previews, options);
-            }
-
-            graphics.DrawImageUnscaled(_projectionThumbnailCache!, layout.StartX, layout.Top);
-        }
-
+        // Cria os dados basicos de cada miniatura de projecao.
         private static ProjectionThumbnailDefinition[] CreateProjectionThumbnailDefinitions()
         {
             return
@@ -1660,80 +1669,7 @@ namespace _3d_graphics_editor.Rendering
             ];
         }
 
-        private static ProjectionThumbnailLayout CalculateProjectionThumbnailLayout(Rectangle renderBounds, int previewCount)
-        {
-            var thumbnailWidth = Math.Clamp(renderBounds.Width / (previewCount + 1), 72, 112);
-            var thumbnailHeight = Math.Clamp(renderBounds.Height / 5, 72, 98);
-            var totalWidth = (thumbnailWidth * previewCount) + (ThumbnailGap * (previewCount - 1));
-
-            return new ProjectionThumbnailLayout(
-                thumbnailWidth,
-                thumbnailHeight,
-                totalWidth,
-                renderBounds.Right - 18 - totalWidth,
-                renderBounds.Bottom - 18 - thumbnailHeight);
-        }
-
-        private bool IsProjectionThumbnailCacheValid(
-            Mesh mesh,
-            ProjectionThumbnailLayout layout,
-            ViewportRenderOptions options)
-        {
-            var cacheSize = new Size(layout.TotalWidth, layout.ThumbnailHeight);
-
-            return _projectionThumbnailCache is not null &&
-                   ReferenceEquals(_projectionThumbnailCacheMesh, mesh) &&
-                   _projectionThumbnailCacheVersion == options.ProjectionThumbnailVersion &&
-                   _projectionThumbnailCacheSize == cacheSize &&
-                   _projectionThumbnailCacheProjection == options.Projection &&
-                   _projectionThumbnailCacheParameters.Equals(options.Parameters) &&
-                   _projectionThumbnailCacheFillFaces == options.FillFaces &&
-                   _projectionThumbnailCacheShowEdges == options.ShowEdges &&
-                   _projectionThumbnailCacheShowBackFaces == options.ShowBackFaces;
-        }
-
-        private void RebuildProjectionThumbnailCache(
-            Mesh mesh,
-            Vector3D[] transformedVertices,
-            ProjectionThumbnailLayout layout,
-            ProjectionThumbnailDefinition[] previews,
-            ViewportRenderOptions options)
-        {
-            var cacheSize = new Size(layout.TotalWidth, layout.ThumbnailHeight);
-            _projectionThumbnailCache?.Dispose();
-            _projectionThumbnailCache = new Bitmap(cacheSize.Width, cacheSize.Height, PixelFormat.Format32bppArgb);
-
-            using var cacheGraphics = Graphics.FromImage(_projectionThumbnailCache);
-            cacheGraphics.SmoothingMode = SmoothingMode.AntiAlias;
-            cacheGraphics.Clear(Color.Transparent);
-
-            for (var i = 0; i < previews.Length; i++)
-            {
-                var thumbnailBounds = new Rectangle(
-                    i * (layout.ThumbnailWidth + ThumbnailGap),
-                    0,
-                    layout.ThumbnailWidth,
-                    layout.ThumbnailHeight);
-
-                DrawProjectionThumbnail(
-                    cacheGraphics,
-                    mesh,
-                    transformedVertices,
-                    thumbnailBounds,
-                    previews[i],
-                    options);
-            }
-
-            _projectionThumbnailCacheMesh = mesh;
-            _projectionThumbnailCacheVersion = options.ProjectionThumbnailVersion;
-            _projectionThumbnailCacheSize = cacheSize;
-            _projectionThumbnailCacheProjection = options.Projection;
-            _projectionThumbnailCacheParameters = options.Parameters;
-            _projectionThumbnailCacheFillFaces = options.FillFaces;
-            _projectionThumbnailCacheShowEdges = options.ShowEdges;
-            _projectionThumbnailCacheShowBackFaces = options.ShowBackFaces;
-        }
-
+        // Desenha uma miniatura individual de uma projecao.
         private void DrawProjectionThumbnail(
             Graphics graphics,
             Mesh mesh,
@@ -1793,21 +1729,7 @@ namespace _3d_graphics_editor.Rendering
             }
         }
 
-        private static string GetProjectionLabel(ProjectionView projection)
-        {
-            return projection switch
-            {
-                ProjectionView.Normal => "Normal (XYZ)",
-                ProjectionView.Frontal => "Frontal (XY)",
-                ProjectionView.Superior => "Superior (XZ)",
-                ProjectionView.Lateral => "Lateral (YZ)",
-                ProjectionView.Cavalier => "Cavaleira",
-                ProjectionView.Cabinet => "Gabinete",
-                ProjectionView.OnePointPerspective => "Perspectiva 1 PF",
-                _ => "Normal (XYZ)"
-            };
-        }
-
+        // Monta o texto curto exibido na etiqueta da projecao.
         private static string BuildProjectionBadgeText(ProjectionView projection, ProjectionParameters parameters)
         {
             return projection switch
@@ -1828,6 +1750,7 @@ namespace _3d_graphics_editor.Rendering
             };
         }
 
+        // Converte o valor do slider de Z em deslocamento de profundidade.
         private static float MapPerspectiveZOffsetToDepth(float zOffset)
         {
             // O slider vai de 100 a 400. Mantemos uma profundidade-base fixa
@@ -1836,11 +1759,13 @@ namespace _3d_graphics_editor.Rendering
             return PerspectiveBaseDepthOffset + (zOffset / 100f);
         }
 
+        // Diz se a projecao atual e ortografica.
         private static bool IsOrthographicProjection(ProjectionView projection)
         {
             return projection is ProjectionView.Frontal or ProjectionView.Superior or ProjectionView.Lateral;
         }
 
+        // Retorna a direcao de observacao das projecoes ortograficas.
         private static Vector3D GetOrthographicProjectionDirection(ProjectionView projection)
         {
             return projection switch
@@ -1851,6 +1776,7 @@ namespace _3d_graphics_editor.Rendering
             };
         }
 
+        // Retorna a direcao de observacao das projecoes obliquas.
         private static Vector3D GetObliqueProjectionDirection(ProjectionView projection, ProjectionParameters parameters)
         {
             var depthFactor = projection == ProjectionView.Cabinet
@@ -1869,6 +1795,7 @@ namespace _3d_graphics_editor.Rendering
                 1f);
         }
 
+        // Desenha a linha do horizonte e o ponto de fuga da perspectiva 1 PF.
         private static void DrawOnePointPerspectiveGuides(Graphics graphics, Rectangle bounds, Color accentColor)
         {
             using var horizonPen = new Pen(Color.FromArgb(108, accentColor), 1f);
@@ -1880,11 +1807,13 @@ namespace _3d_graphics_editor.Rendering
             graphics.FillEllipse(vanishingPointBrush, centerX - 4f, centerY - 4f, 8f, 8f);
         }
 
+        // Converte graus para radianos.
         private static float DegreesToRadians(float degrees)
         {
             return degrees * (MathF.PI / 180f);
         }
 
+        // Rotaciona um ponto ao redor do eixo X.
         private static Vector3D RotateX(Vector3D point, float radians)
         {
             var cosine = MathF.Cos(radians);
@@ -1896,6 +1825,7 @@ namespace _3d_graphics_editor.Rendering
                 (point.Y * sine) + (point.Z * cosine));
         }
 
+        // Rotaciona um ponto ao redor do eixo Y.
         private static Vector3D RotateY(Vector3D point, float radians)
         {
             var cosine = MathF.Cos(radians);
@@ -1907,6 +1837,7 @@ namespace _3d_graphics_editor.Rendering
                 (-point.X * sine) + (point.Z * cosine));
         }
 
+        // Calcula a normal geometrica de uma face usando tres vertices.
         private static Vector3D ComputeFaceNormal(Vector3D first, Vector3D second, Vector3D third)
         {
             var edgeA = Subtract(second, first);
@@ -1914,16 +1845,19 @@ namespace _3d_graphics_editor.Rendering
             return Cross(edgeA, edgeB);
         }
 
+        // Subtrai um vetor do outro.
         private static Vector3D Subtract(Vector3D left, Vector3D right)
         {
             return new Vector3D(left.X - right.X, left.Y - right.Y, left.Z - right.Z);
         }
 
+        // Soma dois vetores.
         private static Vector3D Add(Vector3D left, Vector3D right)
         {
             return new Vector3D(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
         }
 
+        // Divide um vetor por um numero, evitando divisao por zero.
         private static Vector3D Divide(Vector3D vector, float divisor)
         {
             if (MathF.Abs(divisor) <= 0.000001f)
@@ -1934,6 +1868,7 @@ namespace _3d_graphics_editor.Rendering
             return new Vector3D(vector.X / divisor, vector.Y / divisor, vector.Z / divisor);
         }
 
+        // Ajusta o vetor para ter tamanho 1.
         private static Vector3D Normalize(Vector3D vector)
         {
             var lengthSquared = LengthSquared(vector);
@@ -1949,6 +1884,7 @@ namespace _3d_graphics_editor.Rendering
                 vector.Z * inverseLength);
         }
 
+        // Calcula o produto vetorial entre dois vetores.
         private static Vector3D Cross(Vector3D left, Vector3D right)
         {
             return new Vector3D(
@@ -1957,16 +1893,19 @@ namespace _3d_graphics_editor.Rendering
                 (left.X * right.Y) - (left.Y * right.X));
         }
 
+        // Calcula o produto escalar entre dois vetores.
         private static float Dot(Vector3D left, Vector3D right)
         {
             return (left.X * right.X) + (left.Y * right.Y) + (left.Z * right.Z);
         }
 
+        // Calcula o tamanho ao quadrado de um vetor.
         private static float LengthSquared(Vector3D vector)
         {
             return Dot(vector, vector);
         }
 
+        // Verifica se um indice esta dentro dos limites de uma lista.
         private static bool IsValidIndex(int index, int count)
         {
             return index >= 0 && index < count;
@@ -1992,13 +1931,6 @@ namespace _3d_graphics_editor.Rendering
             ProjectionView View,
             string Label,
             Color AccentColor);
-
-        private readonly record struct ProjectionThumbnailLayout(
-            int ThumbnailWidth,
-            int ThumbnailHeight,
-            int TotalWidth,
-            int StartX,
-            int Top);
 
         private sealed class EdgeEntry
         {
@@ -2029,12 +1961,14 @@ namespace _3d_graphics_editor.Rendering
 
         private readonly record struct Edge2D(PointF First, PointF Second)
         {
+            // Compara arestas considerando que a ordem dos pontos nao importa.
             public bool Equals(Edge2D other)
             {
                 return (PointsEqual(First, other.First) && PointsEqual(Second, other.Second)) ||
                        (PointsEqual(First, other.Second) && PointsEqual(Second, other.First));
             }
 
+            // Gera um hash igual para a mesma aresta, mesmo invertendo inicio e fim.
             public override int GetHashCode()
             {
                 var firstHash = HashPoint(First);
@@ -2044,11 +1978,13 @@ namespace _3d_graphics_editor.Rendering
                     : HashCode.Combine(secondHash, firstHash);
             }
 
+            // Verifica se dois pontos 2D sao exatamente iguais.
             private static bool PointsEqual(PointF first, PointF second)
             {
                 return first.X.Equals(second.X) && first.Y.Equals(second.Y);
             }
 
+            // Gera o hash de um ponto 2D.
             private static int HashPoint(PointF point)
             {
                 return HashCode.Combine(point.X, point.Y);
@@ -2061,6 +1997,7 @@ namespace _3d_graphics_editor.Rendering
             public float Y;
             public float Z;
 
+            // Cria um vetor 3D simples com X, Y e Z.
             public Vector3D(float x, float y, float z)
             {
                 X = x;

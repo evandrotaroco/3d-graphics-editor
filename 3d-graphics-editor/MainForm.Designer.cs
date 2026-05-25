@@ -9,6 +9,7 @@ namespace _3d_graphics_editor
 
         private GroupBox viewportGroupBox;
         private Rendering.DoubleBufferedPanel viewportPanel;
+        private FlowLayoutPanel projectionThumbnailsPanel;
         private Panel sidebarPanel;
         private Label sidebarTitleLabel;
         private Button openButton;
@@ -118,6 +119,7 @@ namespace _3d_graphics_editor
         {
             viewportGroupBox = new GroupBox();
             viewportPanel = new _3d_graphics_editor.Rendering.DoubleBufferedPanel();
+            projectionThumbnailsPanel = new FlowLayoutPanel();
             sidebarPanel = new Panel();
             modeContentPanel = new Panel();
             projectionPagePanel = new Panel();
@@ -203,6 +205,7 @@ namespace _3d_graphics_editor
             openButton = new Button();
             sidebarTitleLabel = new Label();
             viewportGroupBox.SuspendLayout();
+            viewportPanel.SuspendLayout();
             sidebarPanel.SuspendLayout();
             modeContentPanel.SuspendLayout();
             projectionPagePanel.SuspendLayout();
@@ -251,12 +254,28 @@ namespace _3d_graphics_editor
             // viewportPanel
             //
             viewportPanel.BackColor = Color.White;
+            viewportPanel.Controls.Add(projectionThumbnailsPanel);
             viewportPanel.Dock = DockStyle.Fill;
             viewportPanel.Location = new Point(14, 32);
             viewportPanel.Name = "viewportPanel";
             viewportPanel.Size = new Size(922, 707);
             viewportPanel.TabIndex = 0;
             viewportPanel.TabStop = true;
+            //
+            // projectionThumbnailsPanel
+            //
+            projectionThumbnailsPanel.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
+            projectionThumbnailsPanel.AutoSize = true;
+            projectionThumbnailsPanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            projectionThumbnailsPanel.BackColor = Color.FromArgb(245, 248, 252);
+            projectionThumbnailsPanel.FlowDirection = FlowDirection.LeftToRight;
+            projectionThumbnailsPanel.Location = new Point(360, 610);
+            projectionThumbnailsPanel.Name = "projectionThumbnailsPanel";
+            projectionThumbnailsPanel.Padding = new Padding(6);
+            projectionThumbnailsPanel.Size = new Size(12, 12);
+            projectionThumbnailsPanel.TabIndex = 0;
+            projectionThumbnailsPanel.Visible = false;
+            projectionThumbnailsPanel.WrapContents = false;
             //
             // sidebarPanel
             //
@@ -1201,6 +1220,8 @@ namespace _3d_graphics_editor
             Name = "MainForm";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "3D Graphics Editor";
+            viewportPanel.ResumeLayout(false);
+            viewportPanel.PerformLayout();
             viewportGroupBox.ResumeLayout(false);
             sidebarPanel.ResumeLayout(false);
             modeContentPanel.ResumeLayout(false);
