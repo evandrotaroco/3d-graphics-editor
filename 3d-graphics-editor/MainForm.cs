@@ -808,6 +808,7 @@ namespace _3d_graphics_editor
                 mode,
                 projection,
                 BuildProjectionParameters(),
+                _sidebarView == SidebarView.Lighting && fillFacesCheckBox.Checked,
                 GetSelectedShadingMode(),
                 BuildLightingOptions());
         }
@@ -821,6 +822,7 @@ namespace _3d_graphics_editor
                 ViewportMode.Projection,
                 GetSelectedProjectionView(),
                 BuildProjectionParameters(),
+                false,
                 ShadingMode.Flat,
                 LightingOptions.Default);
         }
@@ -1106,6 +1108,7 @@ namespace _3d_graphics_editor
                 ? fallback
                 : Vector3.Normalize(vector);
         }
+
 
         private enum DragMode
         {

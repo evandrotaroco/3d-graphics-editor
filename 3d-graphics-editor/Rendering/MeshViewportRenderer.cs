@@ -17,6 +17,7 @@ namespace _3d_graphics_editor.Rendering
         private const float PerspectiveBaseDepthOffset = 2f;
         private const float DepthEpsilon = 0.0001f;
         private const float EdgeDepthEpsilon = 0.01f;
+        private const float LightMarkerDistance = 1.8f;
         private const int TransparentPixel = 0;
         private static readonly Color ViewportBackgroundColor = Color.White;
         private static readonly Color BorderColor = Color.FromArgb(120, 138, 160);
@@ -94,6 +95,17 @@ namespace _3d_graphics_editor.Rendering
                 null,
                 options.ShadingMode,
                 options.Lighting);
+
+            if (options.ShowLightMarker)
+            {
+                DrawLightMarker(
+                    graphics,
+                    projectionVertices,
+                    renderBounds,
+                    mainProjection,
+                    options.Parameters,
+                    options.Lighting);
+            }
 
             if (mainProjection == ProjectionView.OnePointPerspective)
             {
@@ -723,6 +735,92 @@ namespace _3d_graphics_editor.Rendering
             }
 
             return point.Z;
+        }
+
+        // Desenha uma bolinha amarela indicando a posicao da luz.
+        private static void DrawLightMarker(
+            Graphics graphics,
+            Vector3D[] projectedVertices,
+            Rectangle bounds,
+            ProjectionView projection,
+            ProjectionParameters parameters,
+            LightingOptions lighting)
+        {
+            if (projectedVertices.Length == 0)
+            {
+                return;
+            }
+
+            var modelCenter = ComputeCenter(projectedVertices);
+            var lightPoint = new Vector3D(lighting.LightX, lighting.LightY, lighting.LightZ);
+            if (projection == ProjectionView.Cavalier || projection == ProjectionView.Cabinet)
+            {
+                lightPoint = RotateY(lightPoint, DegreesToRadians(parameters.ObliqueRotationYDegrees));
+            }
+            else if (projection == ProjectionView.OnePointPerspective)
+            {
+                lightPoint = RotateX(lightPoint, DegreesToRadians(parameters.PerspectiveRotationXDegrees));
+                lightPoint = RotateY(lightPoint, DegreesToRadians(parameters.PerspectiveRotationYDegrees));
+                lightPoint.Z += MapPerspectiveZOffsetToDepth(parameters.PerspectiveZOffset);
+            }
+
+            var lightDirection = Normalize(Subtract(lightPoint, modelCenter));
+            lightPoint = new Vector3D(
+                modelCenter.X + (lightDirection.X * LightMarkerDistance),
+                modelCenter.Y + (lightDirection.Y * LightMarkerDistance),
+                modelCenter.Z + (lightDirection.Z * LightMarkerDistance));
+
+            if (!TryProject(lightPoint, bounds, projection, parameters, out var lightScreenPoint) ||
+                !TryProject(modelCenter, bounds, projection, parameters, out var centerScreenPoint))
+            {
+                return;
+            }
+
+            const float radius = 7f;
+            lightScreenPoint = ClampPointToBounds(lightScreenPoint, bounds, radius + 1f);
+            using var rayPen = new Pen(Color.FromArgb(170, 192, 138, 0), 1.4f)
+            {
+                DashStyle = DashStyle.Dash
+            };
+            using var fillBrush = new SolidBrush(Color.FromArgb(255, 232, 48));
+            using var borderPen = new Pen(Color.FromArgb(116, 89, 0), 1.2f);
+
+            graphics.DrawLine(rayPen, centerScreenPoint, lightScreenPoint);
+            graphics.FillEllipse(
+                fillBrush,
+                lightScreenPoint.X - radius,
+                lightScreenPoint.Y - radius,
+                radius * 2f,
+                radius * 2f);
+            graphics.DrawEllipse(
+                borderPen,
+                lightScreenPoint.X - radius,
+                lightScreenPoint.Y - radius,
+                radius * 2f,
+                radius * 2f);
+        }
+
+        // Mantem um ponto dentro da area visivel, respeitando uma margem.
+        private static PointF ClampPointToBounds(PointF point, Rectangle bounds, float margin)
+        {
+            var minX = bounds.Left + margin;
+            var maxX = bounds.Right - margin;
+            var minY = bounds.Top + margin;
+            var maxY = bounds.Bottom - margin;
+
+            if (minX > maxX)
+            {
+                (minX, maxX) = (maxX, minX);
+            }
+
+            if (minY > maxY)
+            {
+                (minY, maxY) = (maxY, minY);
+            }
+
+            return new PointF(
+                Math.Clamp(point.X, minX, maxX),
+                Math.Clamp(point.Y, minY, maxY));
         }
 
         // Decide se o modelo sera desenhado preenchido, com arestas ou apenas em wireframe.
