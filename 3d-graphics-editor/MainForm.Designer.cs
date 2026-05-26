@@ -130,9 +130,9 @@ namespace _3d_graphics_editor
             ambientComponentRadioButton = new RadioButton();
             totalLightingRadioButton = new RadioButton();
             lightPositionGroupBox = new GroupBox();
+            showLightMarkerCheckBox = new CheckBox();
             lightZTrackBar = new TrackBar();
             lightZLabel = new Label();
-            showLightMarkerCheckBox = new CheckBox();
             lightYTrackBar = new TrackBar();
             lightYLabel = new Label();
             lightXTrackBar = new TrackBar();
@@ -395,17 +395,29 @@ namespace _3d_graphics_editor
             lightPositionGroupBox.TabStop = false;
             lightPositionGroupBox.Text = "Posição da luz";
             // 
+            // showLightMarkerCheckBox
+            // 
+            showLightMarkerCheckBox.AutoSize = true;
+            showLightMarkerCheckBox.Checked = true;
+            showLightMarkerCheckBox.CheckState = CheckState.Checked;
+            showLightMarkerCheckBox.Location = new Point(18, 116);
+            showLightMarkerCheckBox.Name = "showLightMarkerCheckBox";
+            showLightMarkerCheckBox.Size = new Size(155, 19);
+            showLightMarkerCheckBox.TabIndex = 6;
+            showLightMarkerCheckBox.Text = "Mostrar marcador da luz";
+            showLightMarkerCheckBox.UseVisualStyleBackColor = true;
+            // 
             // lightZTrackBar
             // 
             lightZTrackBar.AutoSize = false;
             lightZTrackBar.Location = new Point(98, 84);
-            lightZTrackBar.Maximum = 230;
-            lightZTrackBar.Minimum = -230;
+            lightZTrackBar.Maximum = 130;
+            lightZTrackBar.Minimum = -130;
             lightZTrackBar.Name = "lightZTrackBar";
             lightZTrackBar.Size = new Size(230, 24);
             lightZTrackBar.TabIndex = 5;
             lightZTrackBar.TickStyle = TickStyle.None;
-            lightZTrackBar.Value = -230;
+            lightZTrackBar.Value = -120;
             // 
             // lightZLabel
             // 
@@ -414,19 +426,7 @@ namespace _3d_graphics_editor
             lightZLabel.Name = "lightZLabel";
             lightZLabel.Size = new Size(72, 17);
             lightZLabel.TabIndex = 4;
-            lightZLabel.Text = "Z: -2.30";
-            // 
-            // showLightMarkerCheckBox
-            // 
-            showLightMarkerCheckBox.AutoSize = true;
-            showLightMarkerCheckBox.Checked = true;
-            showLightMarkerCheckBox.CheckState = CheckState.Checked;
-            showLightMarkerCheckBox.Location = new Point(18, 116);
-            showLightMarkerCheckBox.Name = "showLightMarkerCheckBox";
-            showLightMarkerCheckBox.Size = new Size(153, 19);
-            showLightMarkerCheckBox.TabIndex = 6;
-            showLightMarkerCheckBox.Text = "Mostrar marcador da luz";
-            showLightMarkerCheckBox.UseVisualStyleBackColor = true;
+            lightZLabel.Text = "Z: -1.20";
             // 
             // lightYTrackBar
             // 
@@ -438,7 +438,7 @@ namespace _3d_graphics_editor
             lightYTrackBar.Size = new Size(230, 24);
             lightYTrackBar.TabIndex = 3;
             lightYTrackBar.TickStyle = TickStyle.None;
-            lightYTrackBar.Value = 80;
+            lightYTrackBar.Value = 65;
             // 
             // lightYLabel
             // 
@@ -447,19 +447,19 @@ namespace _3d_graphics_editor
             lightYLabel.Name = "lightYLabel";
             lightYLabel.Size = new Size(72, 17);
             lightYLabel.TabIndex = 2;
-            lightYLabel.Text = "Y: 0.80";
+            lightYLabel.Text = "Y: 0.65";
             // 
             // lightXTrackBar
             // 
             lightXTrackBar.AutoSize = false;
             lightXTrackBar.Location = new Point(98, 20);
-            lightXTrackBar.Maximum = 130;
-            lightXTrackBar.Minimum = -130;
+            lightXTrackBar.Maximum = 140;
+            lightXTrackBar.Minimum = -140;
             lightXTrackBar.Name = "lightXTrackBar";
             lightXTrackBar.Size = new Size(230, 24);
             lightXTrackBar.TabIndex = 1;
             lightXTrackBar.TickStyle = TickStyle.None;
-            lightXTrackBar.Value = -130;
+            lightXTrackBar.Value = 75;
             // 
             // lightXLabel
             // 
@@ -468,7 +468,7 @@ namespace _3d_graphics_editor
             lightXLabel.Name = "lightXLabel";
             lightXLabel.Size = new Size(72, 17);
             lightXLabel.TabIndex = 0;
-            lightXLabel.Text = "X: -1.30";
+            lightXLabel.Text = "X: 0.75";
             // 
             // specularLightingGroupBox
             // 

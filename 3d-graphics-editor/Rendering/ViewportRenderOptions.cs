@@ -62,9 +62,9 @@ namespace _3d_graphics_editor.Rendering
                 0.82f,
                 0.72f,
                 32f,
-                -1.3f,
-                0.8f,
-                -2.3f,
+                0.75f,
+                0.65f,
+                -1.2f,
                 LightingComponent.Total);
     }
 
