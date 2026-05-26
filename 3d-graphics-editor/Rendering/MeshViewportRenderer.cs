@@ -7,8 +7,9 @@ namespace _3d_graphics_editor.Rendering
 {
     public sealed class MeshViewportRenderer
     {
-        private const float CameraDistance = 5f;
-        private const float PerspectiveScaleFactor = 0.8f;
+        private const float CameraDistance = 2f;
+        private const float NormalizedObjectSize = 1f;
+        private const float PerspectiveScaleFactor = 0.32f;
         private const float ParallelProjectionScaleFactor = 0.22f;
         private const float OnePointPerspectiveScreenDivisor = 500f;
         private const float FixedOnePointFocalDistance = 300f;
@@ -202,7 +203,7 @@ namespace _3d_graphics_editor.Rendering
                 bounds.Max.Z - bounds.Min.Z);
 
             var maxDimension = MathF.Max(size.X, MathF.Max(size.Y, size.Z));
-            var normalizationScale = maxDimension <= 0.0001f ? 1f : 2f / maxDimension;
+            var normalizationScale = maxDimension <= 0.0001f ? 1f : NormalizedObjectSize / maxDimension;
 
             // Mantemos toda a cadeia de transformação 4x4 em um único produto
             // para que translação, escala e rotações sejam aplicadas juntas.
