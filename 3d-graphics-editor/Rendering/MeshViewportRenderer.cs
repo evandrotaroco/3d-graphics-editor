@@ -7,10 +7,10 @@ namespace _3d_graphics_editor.Rendering
 {
     public sealed class MeshViewportRenderer
     {
-        private const float CameraDistance = 4.2f;
-        private const float PerspectiveScaleFactor = 0.78f;
+        private const float CameraDistance = 5f;
+        private const float PerspectiveScaleFactor = 0.8f;
         private const float ParallelProjectionScaleFactor = 0.22f;
-        private const float OnePointPerspectiveScreenDivisor = 1400f;
+        private const float OnePointPerspectiveScreenDivisor = 500f;
         private const float FixedOnePointFocalDistance = 300f;
         private const float CavalierDepthFactor = 1f;
         private const float CabinetDepthFactor = 0.5f;
@@ -30,8 +30,8 @@ namespace _3d_graphics_editor.Rendering
         private static readonly Color CabinetProjectionColor = Color.FromArgb(41, 141, 77);
         private static readonly Color OnePointPerspectiveColor = Color.FromArgb(46, 101, 185);
 
-        private float[] _zBuffer = Array.Empty<float>();
-        private int[] _colorBuffer = Array.Empty<int>();
+        private float[] _zBuffer = [];
+        private int[] _colorBuffer = [];
         private Bitmap? _rasterBitmap;
         // Desenha o viewport inteiro: fundo, modelo, projecao e extras da tela.
         public void Render(
